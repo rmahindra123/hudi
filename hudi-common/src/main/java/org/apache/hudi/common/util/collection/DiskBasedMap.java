@@ -29,6 +29,8 @@ import org.apache.hudi.exception.HoodieNotSupportedException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -47,6 +49,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
+import java.util.zip.Deflater;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
 
 /**
  * This class provides a disk spillable only map implementation. All of the data is currenly written to one file,
@@ -190,8 +195,10 @@ public final class DiskBasedMap<T extends Serializable, R extends Serializable> 
 
   public static <R> R get(ValueMetadata entry, RandomAccessFile file) {
     try {
+      //return SerializationUtils
+        //  .deserialize(SpillableMapUtils.readBytesFromDisk(file, entry.getOffsetOfValue(), entry.getSizeOfValue()));
       return SerializationUtils
-          .deserialize(SpillableMapUtils.readBytesFromDisk(file, entry.getOffsetOfValue(), entry.getSizeOfValue()));
+          .deserialize(decompressBytes(SpillableMapUtils.readBytesFromDisk(file, entry.getOffsetOfValue(), entry.getSizeOfValue())));
     } catch (IOException e) {
       throw new HoodieIOException("Unable to readFromDisk Hoodie Record from disk", e);
     }
@@ -199,7 +206,8 @@ public final class DiskBasedMap<T extends Serializable, R extends Serializable> 
 
   private synchronized R put(T key, R value, boolean flush) {
     try {
-      byte[] val = SerializationUtils.serialize(value);
+      //byte[] val = SerializationUtils.serialize(value);
+      byte[] val = compressBytes(SerializationUtils.serialize(value));
       Integer valueSize = val.length;
       Long timestamp = System.currentTimeMillis();
       this.valueMetadataMap.put(key,
@@ -299,6 +307,37 @@ public final class DiskBasedMap<T extends Serializable, R extends Serializable> 
       entrySet.add(new AbstractMap.SimpleEntry<>(key, get(key)));
     }
     return entrySet;
+  }
+
+  private byte[] compressBytes(final byte [] value) throws IOException {
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
+    DeflaterOutputStream dos = new DeflaterOutputStream(baos, deflater, true);
+    try {
+      dos.write(value);
+    } catch (IOException ignore) {
+      System.out.println("COMPRESSION ERROR " + ignore.getMessage());
+    } finally {
+      dos.flush();
+      dos.close();
+      // Its important to call this.
+      // Deflater takes off-heap native memory and does not release until GC kicks in
+      deflater.end();
+    }
+    return baos.toByteArray();
+  }
+
+  private static byte[] decompressBytes(final byte[] value) throws IOException {
+    InflaterInputStream iis = new InflaterInputStream(new ByteArrayInputStream(value));
+    byte[] output = new byte[128 * 1024];
+    int bytesRead = 0;
+    while (iis.available() > 0) {
+      int len = iis.read(output, bytesRead, 128 * 1024);
+      if (len >= 0) {
+        bytesRead += len;
+      }
+    }
+    return output;
   }
 
   /**

@@ -28,6 +28,7 @@ import org.apache.hudi.exception.HoodieIOException;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.rocksdb.AbstractImmutableNativeReference;
+import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.ColumnFamilyOptions;
@@ -103,6 +104,11 @@ public class RocksDBDAO {
       final List<ColumnFamilyHandle> managedHandles = new ArrayList<>();
       FileIOUtils.mkdir(new File(rocksDBBasePath));
       rocksDB = RocksDB.open(dbOptions, rocksDBBasePath, managedColumnFamilies, managedHandles);
+
+      // disable cache
+      BlockBasedTableConfig tableFormatConfig = new BlockBasedTableConfig().setBlockCacheSize(1L);
+      org.rocksdb.Options options = new org.rocksdb.Options(dbOptions, new ColumnFamilyOptions()).setTableFormatConfig(tableFormatConfig);
+      //rocksDB = RocksDB.open(options, rocksDBBasePath);
 
       ValidationUtils.checkArgument(managedHandles.size() == managedColumnFamilies.size(),
           "Unexpected number of handles are returned");

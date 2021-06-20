@@ -48,6 +48,7 @@ public class HoodieRecordSizeEstimator<T extends HoodieRecordPayload> implements
     // note the sizes and differences. A correct estimation in such cases is handled in
     /** {@link ExternalSpillableMap} **/
     long sizeOfRecord = ObjectSizeCalculator.getObjectSize(hoodieRecord);
+    System.out.println("WNI HoodieRecordSizeEstimator SizeOfRecord => " + sizeOfRecord + " SizeOfSchema => " + sizeOfSchema);
     if (LOG.isDebugEnabled()) {
       LOG.debug("SizeOfRecord => " + sizeOfRecord + " SizeOfSchema => " + sizeOfSchema);
     }

@@ -39,6 +39,7 @@ public class SpillableMapTestUtils {
 
   public static final String DUMMY_COMMIT_TIME = "DUMMY_COMMIT_TIME";
   public static final String DUMMY_FILE_ID = "DUMMY_FILE_ID";
+  private static long idx = 0;
 
   public static List<String> upsertRecords(List<IndexedRecord> iRecords,
       Map<String, HoodieRecord<? extends HoodieRecordPayload>> records) {
@@ -50,7 +51,7 @@ public class SpillableMapTestUtils {
       HoodieRecord record =
           new HoodieRecord<>(new HoodieKey(key, partitionPath), new HoodieAvroPayload(Option.of((GenericRecord) r)));
       record.unseal();
-      record.setCurrentLocation(new HoodieRecordLocation("DUMMY_COMMIT_TIME", "DUMMY_FILE_ID"));
+      record.setCurrentLocation(new HoodieRecordLocation("DUMMY_COMMIT_TIME" + (idx++), "DUMMY_FILE_ID" + (idx++)));
       record.seal();
       records.put(key, record);
     });

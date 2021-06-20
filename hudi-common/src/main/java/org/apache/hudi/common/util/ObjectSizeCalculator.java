@@ -120,6 +120,9 @@ public class ObjectSizeCalculator {
     // Breadth-first traversal instead of naive depth-first with recursive
     // implementation, so we don't blow the stack traversing long linked lists.
     try {
+      if (obj instanceof java.util.Map) {
+        System.out.println("WNI ENTER calculateObjectSize MAP MAP");
+      }
       for (;;) {
         visit(obj);
         if (pending.isEmpty()) {
@@ -147,14 +150,18 @@ public class ObjectSizeCalculator {
     if (alreadyVisited.contains(obj)) {
       return;
     }
+    //System.out.println("WNI IMP " + obj.getClass().getName() + " " + obj.getClass().getFields());
     final Class<?> clazz = obj.getClass();
     if (clazz == ArrayElementsVisitor.class) {
+      //System.out.println("WNI ArrayElementsVisitor");
       ((ArrayElementsVisitor) obj).visit(this);
     } else {
       alreadyVisited.add(obj);
       if (clazz.isArray()) {
+        //System.out.println("WNI isArray");
         visitArray(obj);
       } else {
+        //System.out.println("WNI custom");
         getClassSizeInfo(clazz).visit(obj, this);
       }
     }
@@ -163,10 +170,14 @@ public class ObjectSizeCalculator {
   private void visitArray(Object array) {
     final Class<?> componentType = array.getClass().getComponentType();
     final int length = Array.getLength(array);
+    //System.out.println("WNI Array class name " + array.getClass().getName());
     if (componentType.isPrimitive()) {
       increaseByArraySize(length, getPrimitiveFieldSize(componentType));
+      //System.out.println("WNI isPrimitive" + length + " " + getPrimitiveFieldSize(componentType));
     } else {
       increaseByArraySize(length, referenceSize);
+      //System.out.println("WNI isNotPrimitive " + length + " " + referenceSize);
+
       // If we didn't use an ArrayElementsVisitor, we would be enqueueing every
       // element of the array here instead. For large arrays, it would
       // tremendously enlarge the queue. In essence, we're compressing it into
@@ -216,6 +227,7 @@ public class ObjectSizeCalculator {
   }
 
   void increaseSize(long objectSize) {
+    //System.out.println("SIZE INCR BY " + objectSize);
     size += objectSize;
   }
 
