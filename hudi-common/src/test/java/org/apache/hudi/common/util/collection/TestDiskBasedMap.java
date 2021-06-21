@@ -38,6 +38,8 @@ import org.apache.avro.generic.IndexedRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -66,9 +68,10 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
     initPath();
   }
 
-  @Test
-  public void testSimpleInsert() throws IOException, URISyntaxException {
-    DiskBasedMap records = new DiskBasedMap<>(basePath);
+  @ParameterizedTest
+  @ValueSource(booleans = {true})
+  public void testSimpleInsert(boolean isCompressionEnabled) throws IOException, URISyntaxException {
+    DiskBasedMap records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<IndexedRecord> iRecords = SchemaTestUtil.generateHoodieTestRecords(0, 100);
     ((GenericRecord) iRecords.get(0)).get(HoodieRecord.COMMIT_TIME_METADATA_FIELD).toString();
     List<String> recordKeys = SpillableMapTestUtils.upsertRecords(iRecords, records);
@@ -84,9 +87,10 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
     }
   }
 
-  @Test
-  public void testSimpleInsertWithoutHoodieMetadata() throws IOException, URISyntaxException {
-    DiskBasedMap records = new DiskBasedMap<>(basePath);
+  @ParameterizedTest
+  @ValueSource(booleans = {false})
+  public void testSimpleInsertWithoutHoodieMetadata(boolean isCompressionEnabled) throws IOException, URISyntaxException {
+    DiskBasedMap records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<HoodieRecord> hoodieRecords = SchemaTestUtil.generateHoodieTestRecordsWithoutHoodieMetadata(0, 1000);
     Set<String> recordKeys = new HashSet<>();
     // insert generated records into the map
@@ -105,11 +109,12 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
     }
   }
 
-  @Test
-  public void testSimpleUpsert() throws IOException, URISyntaxException {
+  @ParameterizedTest
+  @ValueSource(booleans = {false})
+  public void testSimpleUpsert(boolean isCompressionEnabled) throws IOException, URISyntaxException {
     Schema schema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
 
-    DiskBasedMap records = new DiskBasedMap<>(basePath);
+    DiskBasedMap records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<IndexedRecord> iRecords = SchemaTestUtil.generateHoodieTestRecords(0, 100);
 
     // perform some inserts
@@ -187,9 +192,10 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
     assertTrue(payloadSize > 0);
   }
 
-  @Test
-  public void testPutAll() throws IOException, URISyntaxException {
-    DiskBasedMap<String, HoodieRecord> records = new DiskBasedMap<>(basePath);
+  @ParameterizedTest
+  @ValueSource(booleans = {false})
+  public void testPutAll(boolean isCompressionEnabled) throws IOException, URISyntaxException {
+    DiskBasedMap<String, HoodieRecord> records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<IndexedRecord> iRecords = SchemaTestUtil.generateHoodieTestRecords(0, 100);
     Map<String, HoodieRecord> recordMap = new HashMap<>();
     iRecords.forEach(r -> {

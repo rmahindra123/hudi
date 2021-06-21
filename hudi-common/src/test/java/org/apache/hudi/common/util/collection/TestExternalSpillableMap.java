@@ -47,6 +47,10 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -322,5 +326,180 @@ public class TestExternalSpillableMap extends HoodieCommonTestHarness {
 
   // TODO : come up with a performance eval test for spillableMap
   @Test
-  public void testLargeInsertUpsert() {}
+  public void testLargeInsertUpsert() throws IOException, URISyntaxException {
+
+    final int numRecordsInFile = 3200;
+    final int numLoopFile = 1500; // 1500 for rockDB and 500 for diskBasedMap
+    final int numTotalRecords = numRecordsInFile * numLoopFile;
+    Schema schema = HoodieAvroUtils.addMetadataFields(SchemaTestUtil.getSimpleSchema());
+
+    ExternalSpillableMap<String, HoodieRecord<? extends HoodieRecordPayload>> externalSpillableMap =
+            new ExternalSpillableMap<>(500000000L, basePath,
+                    new DefaultSizeEstimator(), new HoodieRecordSizeEstimator(schema),
+                    ExternalSpillableMap.DiskMapType.COMPRESSED_DISK_MAP); // 16B
+
+    List<String> overallKeys = new ArrayList<>();
+    List<IndexedRecord> fixedRecordPayload = SchemaTestUtil.generateTestRecords(0, numRecordsInFile);
+    String instantTime = HoodieActiveTimeline.createNewInstantTime();
+    List<IndexedRecord> subRecords;
+    for (int inputCnt = 0; inputCnt < numLoopFile; inputCnt++) {
+      // insert a bunch of externalSpillableMap so that values spill to disk too
+      if (inputCnt%50 == 0) {
+        instantTime = HoodieActiveTimeline.createNewInstantTime();
+      }
+      subRecords = SchemaTestUtil.generateHoodieTestRecords(fixedRecordPayload, instantTime);
+      long startTimeMs = System.currentTimeMillis();
+      overallKeys.addAll(SpillableMapTestUtils.upsertRecords(subRecords, externalSpillableMap));
+      //System.out.println("SIZES OF subRecords and externalSpillableMap (spillable map)" + subRecords.size() + " " + externalSpillableMap.size() + " " + basePath + " " + (System.currentTimeMillis() - startTimeMs));
+      System.out.println("SIZES OF subRecords " + subRecords.size() + " " + basePath + " " + (System.currentTimeMillis() - startTimeMs));
+      if (inputCnt%50==0) {
+        System.out.println("MAP STATS " + externalSpillableMap.getDiskBasedMapNumEntries() + " " + externalSpillableMap.getSizeOfFileOnDiskInBytes() + " " + externalSpillableMap.getInMemoryMapNumEntries() + " " + externalSpillableMap.getCurrentInMemoryMapSize());
+      }
+    }
+
+    new StressTestSpillableMap(
+            1,
+            10000,//250000,
+            overallKeys,
+            numTotalRecords,
+            externalSpillableMap).start();
+
+    /*new StressTestSpillableMap(
+            5,
+            500001,
+            overallKeys,
+            numTotalRecords,
+            externalSpillableMap).start();*/
+
+    System.out.println("MAP STATS " + externalSpillableMap.getDiskBasedMapNumEntries() + " " + externalSpillableMap.getSizeOfFileOnDiskInBytes() + " " + externalSpillableMap.getInMemoryMapNumEntries());
+  }
+
+  public static class StressTestSpillableMap {
+
+    private final int numThreads;
+    private final int maxStressCnt;
+    private final List<String > overallKeys;
+    private final int numTotalRecords;
+    private final ExternalSpillableMap<String, HoodieRecord<? extends HoodieRecordPayload>> externalSpillableMap;
+    private final CountDownLatch latch;
+
+    public StressTestSpillableMap(int numThreads, int maxStressCnt, List<String> overallKeys, int numTotalRecords, ExternalSpillableMap<String, HoodieRecord<? extends HoodieRecordPayload>> externalSpillableMap) {
+      this.numThreads = numThreads;
+      this.maxStressCnt = maxStressCnt;
+      this.overallKeys = overallKeys;
+      this.numTotalRecords = numTotalRecords;
+      this.externalSpillableMap = externalSpillableMap;
+      this.latch = new CountDownLatch(numThreads);
+    }
+
+    public void start() {
+      System.out.println("Starting one run with numThreads: " + numThreads + " and stressCnt " + maxStressCnt);
+      ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+      long startTimeMs = System.currentTimeMillis();
+      for (int i = 0; i < numThreads; i++) {
+        executorService.execute(new GetPutRequestGenerator(i+1,maxStressCnt/numThreads, overallKeys, numTotalRecords, externalSpillableMap, latch));
+      }
+      try {
+        latch.await();
+      } catch (Exception exc) {
+        System.out.println("OH NO " + exc.getMessage());
+      }
+      long endTimeMs = System.currentTimeMillis();
+      System.out.println("ALL THREADS DONE TOTAL TIME " + (endTimeMs - startTimeMs));
+
+    }
+
+    public static class GetPutRequestGenerator implements Runnable {
+
+      private static final Random RANDOM = new Random();
+
+      private final int threadIdx;
+      private final int maxStressCnt;
+      private final List<String > overallKeys;
+      private final int numTotalRecords;
+      private final ExternalSpillableMap<String, HoodieRecord<? extends HoodieRecordPayload>> externalSpillableMap;
+      private final CountDownLatch latch;
+
+      public GetPutRequestGenerator(int threadIdx, int maxStressCnt, List<String> overallKeys, int numTotalRecords, ExternalSpillableMap<String, HoodieRecord<? extends HoodieRecordPayload>> externalSpillableMap, CountDownLatch latch) {
+        this.threadIdx = threadIdx;
+        this.maxStressCnt = maxStressCnt;
+        this.overallKeys = overallKeys;
+        this.numTotalRecords = numTotalRecords;
+        this.externalSpillableMap = externalSpillableMap;
+        this.latch = latch;
+      }
+
+      @Override
+      public void run() {
+        System.out.println("Starting Thread idx: " + threadIdx);
+        long stressCnt = 0;
+
+        long getMemoryLatencyAvg = 0;
+        int totalGetMemoryCnt = 1;
+        long getDiskLatencyAvg = 0;
+        int totalGetDiskCnt = 1;
+
+        long putMemoryLatencyAvg = 0;
+        int totalPutMemoryCnt = 1;
+        long putDiskLatencyAvg = 0;
+        int totalPutDiskCnt = 1;
+
+        for (; stressCnt <= maxStressCnt; stressCnt++) {
+        /*if (stressCnt % 1000 == 0) {
+          System.out.println("THREAD IDX " + threadIdx + " ENTER STRESS CNT " + stressCnt + " AT " + System.currentTimeMillis());
+        }*/
+          // First do a random GET
+          //Do not benchmark this
+          String actualKey = overallKeys.get(RANDOM.nextInt(numTotalRecords));
+
+          // Start benchmark
+          long startTimeMs = System.nanoTime();
+          HoodieRecord lastReadRecord = externalSpillableMap.get(actualKey);
+          long completeTimeMs = System.nanoTime();
+          Long totalLatency = (completeTimeMs - startTimeMs);
+          if (totalLatency >= 0) {
+            String type = "UNKNOWN";
+            if (externalSpillableMap.inMemoryContainsKey(actualKey)) {
+              type = "MEMORY";
+              getMemoryLatencyAvg += totalLatency;
+              totalGetMemoryCnt += 1;
+            } else if (externalSpillableMap.inDiskContainsKey(actualKey)) {
+              type = "DISK";
+              getDiskLatencyAvg += totalLatency;
+              totalGetDiskCnt += 1;
+            } else {
+              System.out.println("GET Key is neither in disk nor mem " + actualKey);
+            }
+            //System.out.println("GET " + type + " TIME " + (totalLatency) + " KEY " + actualKey);
+          }
+
+          // Second do a random PUT, ensure we pick another random key
+          actualKey = overallKeys.get(RANDOM.nextInt(numTotalRecords));
+
+          startTimeMs = System.nanoTime();
+          externalSpillableMap.put(actualKey, lastReadRecord);
+          completeTimeMs = System.nanoTime();
+          totalLatency = (completeTimeMs - startTimeMs);
+          if (totalLatency >= 0) {
+            String type = "UNKNOWN";
+            if (externalSpillableMap.inMemoryContainsKey(actualKey)) {
+              type = "MEMORY";
+              putMemoryLatencyAvg += totalLatency;
+              totalPutMemoryCnt += 1;
+            } else if (externalSpillableMap.inDiskContainsKey(actualKey)) {
+              type = "DISK";
+              putDiskLatencyAvg += totalLatency;
+              totalPutDiskCnt += 1;
+            } /*else {
+            System.out.println("PUT Key is neither in disk nor mem " + actualKey);
+          }*/
+            //System.out.println("PUT " + type + " TIME " + (totalLatency) + " KEY " + actualKey);
+          }
+        }
+
+        System.out.println("THREAD IDX " + threadIdx + "LATENCY STATS NUM RECORDS " + stressCnt + " GET MEM " + getMemoryLatencyAvg/totalGetMemoryCnt + " GET DISK " + getDiskLatencyAvg/totalGetDiskCnt + " PUT MEM " + putMemoryLatencyAvg/totalPutMemoryCnt + " PUT DISK " + putDiskLatencyAvg/totalPutDiskCnt);
+        latch.countDown();
+      }
+    }
+  }
 }

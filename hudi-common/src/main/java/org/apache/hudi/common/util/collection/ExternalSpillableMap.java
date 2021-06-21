@@ -109,6 +109,9 @@ public class ExternalSpillableMap<T extends Serializable, R extends Serializable
               case ROCK_DB:
                 diskBasedMap = new SpillableRocksDBBasedMap<>(baseFilePath);
                 break;
+              case COMPRESSED_DISK_MAP:
+                diskBasedMap = new DiskBasedMap<>(baseFilePath, true);
+                break;
               case DISK_MAP:
               default:
                 diskBasedMap = new DiskBasedMap<>(baseFilePath);
@@ -286,6 +289,7 @@ public class ExternalSpillableMap<T extends Serializable, R extends Serializable
 
   public enum DiskMapType {
     DISK_MAP("disk_map"),
+    COMPRESSED_DISK_MAP("compress_disk_map"),
     ROCK_DB("rock_db"),
     UNKNOWN("unknown");
 
@@ -310,6 +314,8 @@ public class ExternalSpillableMap<T extends Serializable, R extends Serializable
       switch (value.toLowerCase(Locale.ROOT)) {
         case "disk_map":
           return DISK_MAP;
+        case "compress_disk_map":
+          return COMPRESSED_DISK_MAP;
         case "rock_db":
           return ROCK_DB;
         default:

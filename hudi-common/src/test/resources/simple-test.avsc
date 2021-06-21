@@ -17,11 +17,43 @@
  */
 {
 "namespace": "example.avro",
- "type": "record",
- "name": "User",
- "fields": [
-     {"name": "name", "type": "string"},
-     {"name": "favorite_number",  "type": "int"},
-     {"name": "favorite_color", "type": "string"}
- ]
-}
+  "type":"record",
+  "name":"User",
+  "fields":[{
+     "name": "volume",
+     "type": "long"
+  }, {
+     "name": "ts",
+     "type": "string"
+  }, {
+     "name": "symbol",
+     "type": "string"
+  },{
+     "name": "year",
+     "type": "int"
+  },{
+     "name": "month",
+     "type": "string"
+  },{
+     "name": "high",
+     "type": "double"
+  },{
+     "name": "low",
+     "type": "double"
+  },{
+     "name": "key",
+     "type": "string"
+  },{
+     "name": "date",
+     "type":"string"
+  }, {
+     "name": "close",
+     "type": "double"
+  }, {
+     "name": "open",
+     "type": "double"
+  }, {
+     "name": "day",
+     "type":"string"
+  }
+]}

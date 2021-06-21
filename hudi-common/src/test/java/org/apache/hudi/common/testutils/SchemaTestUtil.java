@@ -101,10 +101,8 @@ public final class SchemaTestUtil {
     return fs.getPath(array[1]);
   }
 
-  public static List<IndexedRecord> generateHoodieTestRecords(int from, int limit)
-      throws IOException, URISyntaxException {
-    List<IndexedRecord> records = generateTestRecords(from, limit);
-    String instantTime = HoodieActiveTimeline.createNewInstantTime();
+  public static List<IndexedRecord> generateHoodieTestRecords(List<IndexedRecord> records, String instantTime)
+          throws IOException, URISyntaxException {
     Schema hoodieFieldsSchema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
     return records.stream().map(s -> HoodieAvroUtils.rewriteRecord((GenericRecord) s, hoodieFieldsSchema)).map(p -> {
       p.put(HoodieRecord.RECORD_KEY_METADATA_FIELD, UUID.randomUUID().toString());
@@ -112,7 +110,13 @@ public final class SchemaTestUtil {
       p.put(HoodieRecord.COMMIT_TIME_METADATA_FIELD, instantTime);
       return p;
     }).collect(Collectors.toList());
+  }
 
+  public static List<IndexedRecord> generateHoodieTestRecords(int from, int limit)
+          throws IOException, URISyntaxException {
+    List<IndexedRecord> records = generateTestRecords(from, limit);
+    String instantTime = HoodieActiveTimeline.createNewInstantTime();
+    return generateHoodieTestRecords(records, instantTime);
   }
 
   public static List<HoodieRecord> generateHoodieTestRecords(int from, int limit, Schema schema)
