@@ -96,7 +96,6 @@ public final class DiskBasedMap<T extends Serializable, R extends Serializable> 
     this.fileOutputStream = new FileOutputStream(writeOnlyFile, true);
     this.writeOnlyFileHandle = new SizeAwareDataOutputStream(fileOutputStream, BUFFER_SIZE);
     this.filePosition = new AtomicLong(0L);
-    System.out.println("WNI " + isCompressionEnabled);
   }
 
   public DiskBasedMap(String baseFilePath) throws IOException {
@@ -451,8 +450,10 @@ public final class DiskBasedMap<T extends Serializable, R extends Serializable> 
       InputStream in = new InflaterInputStream(new ByteArrayInputStream(bytes));
       try {
         int len;
+        int offset = 0;
         while ((len = in.read(decompressBuffer)) >= 0) {
-          decompressBaos.write(decompressBuffer, 0, len);
+          decompressBaos.write(decompressBuffer, offset, len);
+          offset += len;
         }
         return decompressBaos.toByteArray();
       } catch (IOException e) {

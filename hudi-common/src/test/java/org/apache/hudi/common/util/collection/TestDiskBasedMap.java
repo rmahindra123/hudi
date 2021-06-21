@@ -69,7 +69,7 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {true})
+  @ValueSource(booleans = {false, true})
   public void testSimpleInsert(boolean isCompressionEnabled) throws IOException, URISyntaxException {
     DiskBasedMap records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<IndexedRecord> iRecords = SchemaTestUtil.generateHoodieTestRecords(0, 100);
@@ -88,7 +88,7 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false})
+  @ValueSource(booleans = {false, true})
   public void testSimpleInsertWithoutHoodieMetadata(boolean isCompressionEnabled) throws IOException, URISyntaxException {
     DiskBasedMap records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<HoodieRecord> hoodieRecords = SchemaTestUtil.generateHoodieTestRecordsWithoutHoodieMetadata(0, 1000);
@@ -110,7 +110,7 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false})
+  @ValueSource(booleans = {false, true})
   public void testSimpleUpsert(boolean isCompressionEnabled) throws IOException, URISyntaxException {
     Schema schema = HoodieAvroUtils.addMetadataFields(getSimpleSchema());
 
@@ -193,7 +193,7 @@ public class TestDiskBasedMap extends HoodieCommonTestHarness {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false})
+  @ValueSource(booleans = {false, true})
   public void testPutAll(boolean isCompressionEnabled) throws IOException, URISyntaxException {
     DiskBasedMap<String, HoodieRecord> records = new DiskBasedMap<>(basePath, isCompressionEnabled);
     List<IndexedRecord> iRecords = SchemaTestUtil.generateHoodieTestRecords(0, 100);

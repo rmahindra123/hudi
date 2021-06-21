@@ -336,15 +336,16 @@ public class TestExternalSpillableMap extends HoodieCommonTestHarness {
     ExternalSpillableMap<String, HoodieRecord<? extends HoodieRecordPayload>> externalSpillableMap =
             new ExternalSpillableMap<>(500000000L, basePath,
                     new DefaultSizeEstimator(), new HoodieRecordSizeEstimator(schema),
-                    ExternalSpillableMap.DiskMapType.COMPRESSED_DISK_MAP); // 16B
+                    ExternalSpillableMap.DiskMapType.ROCK_DB); // 16B
 
     List<String> overallKeys = new ArrayList<>();
     List<IndexedRecord> fixedRecordPayload = SchemaTestUtil.generateTestRecords(0, numRecordsInFile);
     String instantTime = HoodieActiveTimeline.createNewInstantTime();
     List<IndexedRecord> subRecords;
+    long startLoadTimeMs = System.currentTimeMillis();
     for (int inputCnt = 0; inputCnt < numLoopFile; inputCnt++) {
       // insert a bunch of externalSpillableMap so that values spill to disk too
-      if (inputCnt%50 == 0) {
+      if (inputCnt%1000 == 0) {
         instantTime = HoodieActiveTimeline.createNewInstantTime();
       }
       subRecords = SchemaTestUtil.generateHoodieTestRecords(fixedRecordPayload, instantTime);
@@ -356,7 +357,21 @@ public class TestExternalSpillableMap extends HoodieCommonTestHarness {
         System.out.println("MAP STATS " + externalSpillableMap.getDiskBasedMapNumEntries() + " " + externalSpillableMap.getSizeOfFileOnDiskInBytes() + " " + externalSpillableMap.getInMemoryMapNumEntries() + " " + externalSpillableMap.getCurrentInMemoryMapSize());
       }
     }
+    long endLoadTimeMs = System.currentTimeMillis();
+    System.out.println("LOAD STATS " + (endLoadTimeMs - startLoadTimeMs));
 
+    // Sequential access test
+    startLoadTimeMs = System.currentTimeMillis();
+    Iterator<HoodieRecord<? extends HoodieRecordPayload>> itr = externalSpillableMap.iterator();
+    int cnt = 0;
+    while (cnt <= 25000) {
+      HoodieRecord<? extends HoodieRecordPayload> ignore = itr.next();
+      cnt++;
+    }
+    endLoadTimeMs = System.currentTimeMillis();
+    System.out.println("SEQUENTIAL READ STATS for 25000 records = " + (endLoadTimeMs - startLoadTimeMs));
+
+    // Random access test
     new StressTestSpillableMap(
             1,
             10000,//250000,
