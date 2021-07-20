@@ -43,6 +43,10 @@ public class DefaultHoodieRecordPayload extends OverwriteWithLatestAvroPayload {
   public static final String METADATA_EVENT_TIME_KEY = "metadata.event_time.key";
   private Option<Object> eventTime = Option.empty();
 
+  public DefaultHoodieRecordPayload(GenericRecord record,  boolean avoidByteArrayConversionEnabled) {
+    super(record, avoidByteArrayConversionEnabled);
+  }
+
   public DefaultHoodieRecordPayload(GenericRecord record, Comparable orderingVal) {
     super(record, orderingVal);
   }

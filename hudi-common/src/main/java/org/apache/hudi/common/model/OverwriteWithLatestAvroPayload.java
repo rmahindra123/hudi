@@ -25,6 +25,8 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 
 /**
@@ -38,8 +40,21 @@ import java.io.IOException;
 public class OverwriteWithLatestAvroPayload extends BaseAvroPayload
     implements HoodieRecordPayload<OverwriteWithLatestAvroPayload> {
 
+  @Nullable final private GenericRecord record;
+  private final boolean avoidByteArrayConversionEnabled;
+
+  public OverwriteWithLatestAvroPayload(GenericRecord record,  Comparable orderingVal, boolean avoidByteArrayConversionEnabled) {
+    super(avoidByteArrayConversionEnabled ? null : record, orderingVal);
+    this.record = avoidByteArrayConversionEnabled ? record : null;
+    this.avoidByteArrayConversionEnabled = avoidByteArrayConversionEnabled;
+  }
+
+  public OverwriteWithLatestAvroPayload(Option<GenericRecord> record, boolean avoidByteArrayConversionEnabled) {
+    this(record.isPresent() ? record.get() : null, 0, avoidByteArrayConversionEnabled);
+  }
+
   public OverwriteWithLatestAvroPayload(GenericRecord record, Comparable orderingVal) {
-    super(record, orderingVal);
+    this(record, orderingVal, false);
   }
 
   public OverwriteWithLatestAvroPayload(Option<GenericRecord> record) {
@@ -63,15 +78,8 @@ public class OverwriteWithLatestAvroPayload extends BaseAvroPayload
 
   @Override
   public Option<IndexedRecord> getInsertValue(Schema schema) throws IOException {
-    if (recordBytes.length == 0) {
-      return Option.empty();
-    }
-    IndexedRecord indexedRecord = HoodieAvroUtils.bytesToAvro(recordBytes, schema);
-    if (isDeleteRecord((GenericRecord) indexedRecord)) {
-      return Option.empty();
-    } else {
-      return Option.of(indexedRecord);
-    }
+    return avoidByteArrayConversionEnabled ? Option.of(record) : getInsertValueFromSchema(schema);
+
   }
 
   /**
@@ -95,5 +103,17 @@ public class OverwriteWithLatestAvroPayload extends BaseAvroPayload
    */
   public Boolean overwriteField(Object value, Object defaultValue) {
     return defaultValue == null ? value == null : defaultValue.toString().equals(String.valueOf(value));
+  }
+
+  private Option<IndexedRecord> getInsertValueFromSchema(Schema schema) throws IOException {
+    if (recordBytes.length == 0) {
+      return Option.empty();
+    }
+    IndexedRecord indexedRecord = HoodieAvroUtils.bytesToAvro(recordBytes, schema);
+    if (isDeleteRecord((GenericRecord) indexedRecord)) {
+      return Option.empty();
+    } else {
+      return Option.of(indexedRecord);
+    }
   }
 }

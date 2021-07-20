@@ -19,9 +19,12 @@
 package org.apache.hudi.common.util;
 
 import org.apache.hudi.common.fs.SizeAwareDataOutputStream;
+import org.apache.hudi.common.model.DefaultHoodieRecordPayload;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordPayload;
+import org.apache.hudi.common.model.OverwriteNonDefaultsWithLatestAvroPayload;
+import org.apache.hudi.common.model.OverwriteWithLatestAvroPayload;
 import org.apache.hudi.common.util.collection.BitCaskDiskMap.FileEntry;
 import org.apache.hudi.exception.HoodieCorruptedDataException;
 
@@ -112,8 +115,24 @@ public class SpillableMapUtils {
   public static <R> R convertToHoodieRecordPayload(GenericRecord rec, String payloadClazz) {
     String recKey = rec.get(HoodieRecord.RECORD_KEY_METADATA_FIELD).toString();
     String partitionPath = rec.get(HoodieRecord.PARTITION_PATH_METADATA_FIELD).toString();
-    HoodieRecord<? extends HoodieRecordPayload> hoodieRecord = new HoodieRecord<>(new HoodieKey(recKey, partitionPath),
-        ReflectionUtils.loadPayload(payloadClazz, new Object[] {Option.of(rec)}, Option.class));
+
+    HoodieRecord<? extends HoodieRecordPayload> hoodieRecord;
+    //if (payloadClazz.equals(OverwriteWithLatestAvroPayload.class.getName())) {
+    //System.out.println("WNI VIMP " + payloadClazz);
+      hoodieRecord = new HoodieRecord<>(new HoodieKey(recKey, partitionPath),
+         new org.apache.hudi.common.model.HoodieAvroPayload(Option.of(rec), true));
+    /*} else if (payloadClazz.equals(OverwriteNonDefaultsWithLatestAvroPayload.class.getName())) {
+      hoodieRecord = new HoodieRecord<>(new HoodieKey(recKey, partitionPath),
+          new OverwriteNonDefaultsWithLatestAvroPayload(rec, true));
+    } else if (payloadClazz.equals(DefaultHoodieRecordPayload.class.getName())) {
+      hoodieRecord = new HoodieRecord<>(new HoodieKey(recKey, partitionPath),
+          new DefaultHoodieRecordPayload(rec, true));
+    } else {
+      hoodieRecord = new HoodieRecord<>(new HoodieKey(recKey, partitionPath),
+          ReflectionUtils.loadPayload(payloadClazz, new Object[] {Option.of(rec)}, Option.class));
+    }*/
+    //hoodieRecord = new HoodieRecord<>(new HoodieKey(recKey, partitionPath),
+      //  ReflectionUtils.loadPayload(payloadClazz, new Object[] {Option.of(rec)}, Option.class));
     return (R) hoodieRecord;
   }
 

@@ -25,6 +25,8 @@ import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.generic.IndexedRecord;
 
+import javax.annotation.Nullable;
+
 import java.io.IOException;
 
 /**
@@ -36,13 +38,22 @@ public class HoodieAvroPayload implements HoodieRecordPayload<HoodieAvroPayload>
   // Store the GenericRecord converted to bytes - 1) Doesn't store schema hence memory efficient 2) Makes the payload
   // java serializable
   private final byte[] recordBytes;
+  @Nullable
+  private final GenericRecord record;
+  private final boolean avoidByteArrayConversionEnabled;
+
+  public HoodieAvroPayload(Option<GenericRecord> record, boolean avoidByteArrayConversionEnabled) {
+    this.recordBytes = avoidByteArrayConversionEnabled ? new byte[0] : HoodieAvroUtils.avroToBytes(record.get());
+    if (avoidByteArrayConversionEnabled) {
+      this.record = record.isPresent() ? record.get() : null;
+    } else {
+      this.record = null;
+    }
+    this.avoidByteArrayConversionEnabled = avoidByteArrayConversionEnabled;
+  }
 
   public HoodieAvroPayload(Option<GenericRecord> record) {
-    if (record.isPresent()) {
-      this.recordBytes = HoodieAvroUtils.avroToBytes(record.get());
-    } else {
-      this.recordBytes = new byte[0];
-    }
+    this(record, false);
   }
 
   @Override
@@ -57,6 +68,10 @@ public class HoodieAvroPayload implements HoodieRecordPayload<HoodieAvroPayload>
 
   @Override
   public Option<IndexedRecord> getInsertValue(Schema schema) throws IOException {
+    return avoidByteArrayConversionEnabled ? Option.of(record) : getInsertValueFromSchema(schema);
+  }
+
+  private Option<IndexedRecord> getInsertValueFromSchema(Schema schema) throws IOException {
     if (recordBytes.length == 0) {
       return Option.empty();
     }
