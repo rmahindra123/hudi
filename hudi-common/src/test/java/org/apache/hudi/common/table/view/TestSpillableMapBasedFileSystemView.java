@@ -20,6 +20,10 @@ package org.apache.hudi.common.table.view;
 
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * Tests spillable map based file system view {@link SpillableMapBasedFileSystemView}.
  */
@@ -27,8 +31,18 @@ public class TestSpillableMapBasedFileSystemView extends TestHoodieTableFileSyst
 
   @Override
   protected SyncableFileSystemView getFileSystemView(HoodieTimeline timeline) {
-    return new SpillableMapBasedFileSystemView(metaClient, timeline, FileSystemViewStorageConfig.newBuilder()
+    FileSystemViewStorageConfig config = FileSystemViewStorageConfig.newBuilder()
         // pure disk base View
-        .withStorageType(FileSystemViewStorageType.SPILLABLE_DISK).withMaxMemoryForView(0L).build());
+        .withStorageType(FileSystemViewStorageType.SPILLABLE_DISK).withMaxMemoryForView(0L).build();
+    SpillableMapBasedFileSystemView spillableMapBasedFileSystemView =
+        new SpillableMapBasedFileSystemView(metaClient, timeline, config);
+
+    assertTrue(config.getSpillableDir().startsWith(
+            "/tmp/view_map_"));
+    // Validate UUID is appended to the folder
+    UUID.fromString(config.getSpillableDir()
+          .substring(config.getSpillableDir().lastIndexOf('_') + 1));
+
+    return spillableMapBasedFileSystemView;
   }
 }
