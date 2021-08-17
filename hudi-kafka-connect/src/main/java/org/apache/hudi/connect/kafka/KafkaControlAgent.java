@@ -29,13 +29,13 @@ import org.apache.hudi.connect.core.TransactionParticipant;
  */
 public interface KafkaControlAgent {
 
-  void registerPartitionLeader(TransactionCoordinator leader);
+  void registerTransactionCoordinator(TransactionCoordinator leader);
 
-  void registerPartitionWorker(TransactionParticipant worker);
+  void registerTransactionParticipant(TransactionParticipant worker);
 
-  void deregisterPartitionLeader(TransactionCoordinator leader);
+  void deregisterTransactionCoordinator(TransactionCoordinator leader);
 
-  void deregisterPartitionWorker(TransactionParticipant worker);
+  void deregisterTransactionParticipant(TransactionParticipant worker);
 
   void publishMessage(ControlEvent message);
 }

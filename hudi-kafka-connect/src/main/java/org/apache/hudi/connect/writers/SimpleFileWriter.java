@@ -44,6 +44,9 @@ public class SimpleFileWriter implements RecordWriter {
         String.format("%s-%s.%s", partition, commitTime, FILE_EXTENSION));
     fos = new FileOutputStream(file.getPath(), true);
     this.partition = partition;
+    if (partition.partition() == 1) {
+      HudiCowWriter cowWriter = new HudiCowWriter();
+    }
   }
 
   @Override

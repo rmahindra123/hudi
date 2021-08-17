@@ -15,8 +15,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-<parent>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
         <artifactId>hudi</artifactId>
         <groupId>org.apache.hudi</groupId>
         <version>0.9.0-SNAPSHOT</version>
@@ -31,6 +32,8 @@
     <properties>
         <main.basedir>${project.parent.basedir}</main.basedir>
         <connect.api.version>2.5.0</connect.api.version>
+        <hudi.version>0.9.0-SNAPSHOT</hudi.version>
+        <hadoop.version>2.7.3</hadoop.version>
         <junit.jupiter.version>5.6.2</junit.jupiter.version>
         <testcontainers.version>1.14.1</testcontainers.version>
     </properties>
@@ -42,15 +45,36 @@
             <version>${connect.api.version}</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-java-client</artifactId>
+            <version>0.9.0-SNAPSHOT</version>
+            <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.parquet</groupId>
+                    <artifactId>parquet-avro</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.hudi/hudi-utilities-bundle -->
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-utilities-bundle_2.11</artifactId>
+            <version>${hudi.version}</version>
+            <scope>compile</scope>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
+            <scope>provided</scope>
             <version>2.12.2</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
+            <scope>provided</scope>
             <version>2.12.2</version>
         </dependency>
         <dependency>
@@ -94,33 +118,72 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>compile</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>test-jar</goal>
-                        </goals>
-                        <phase>test-compile</phase>
-                    </execution>
-                </executions>
+                <version>3.8.1</version>
+                <inherited>true</inherited>
                 <configuration>
-                    <skip>false</skip>
+                    <source>1.8</source>
+                    <target>1.8</target>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.apache.rat</groupId>
-                <artifactId>apache-rat-plugin</artifactId>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.3</version>
+                <executions>
+                    <!-- Run shade goal on package phase -->
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                        <artifactSet>
+                            <includes>
+                                <include>org.apache.hudi:hudi-common</include>
+                                <include>org.apache.hudi:hudi-client-common</include>
+                                <include>org.apache.hudi:hudi-spark-client</include>
+                                <include>org.apache.hudi:hudi-utilities_${scala.binary.version}</include>
+                                <include>org.apache.hudi:hudi-spark-common_${scala.binary.version}</include>
+                                <include>org.apache.hudi:hudi-spark_${scala.binary.version}</include>
+                                <include>org.apache.hudi:${hudi.spark.module}_${scala.binary.version}</include>
+                                <include>org.apache.hudi:hudi-hive-sync</include>
+                                <include>org.apache.hudi:hudi-sync-common</include>
+                                <include>org.apache.hudi:hudi-hadoop-mr</include>
+                                <include>org.apache.hudi:hudi-timeline-service</include>
+
+                                <include>com.yammer.metrics:metrics-core</include>
+                                <include>com.beust:jcommander</include>
+                                <include>io.javalin:javalin</include>
+                                <!-- Spark only has mortbay jetty -->
+                                <include>org.eclipse.jetty:*</include>
+                                <include>org.eclipse.jetty.websocket:*</include>
+                                <include>org.jetbrains.kotlin:*</include>
+                                <include>org.rocksdb:rocksdbjni</include>
+                                <include>org.apache.httpcomponents:httpclient</include>
+                                <include>org.apache.httpcomponents:httpcore</include>
+                                <include>org.apache.httpcomponents:fluent-hc</include>
+                                <include>org.antlr:stringtemplate</include>
+
+                                <include>org.apache.hive:hive-common</include>
+                                <include>org.apache.hive:hive-service</include>
+                                <include>org.apache.hive:hive-service-rpc</include>
+                                <include>org.apache.hive:hive-metastore</include>
+                                <include>org.apache.hive:hive-jdbc</include>
+
+                                <include>org.apache.hbase:hbase-client</include>
+                                <include>org.apache.hbase:hbase-common</include>
+                                <include>org.apache.hbase:hbase-protocol</include>
+                                <include>org.apache.hbase:hbase-server</include>
+                                <include>org.apache.htrace:htrace-core</include>
+                                <include>org.apache.curator:curator-framework</include>
+                                <include>org.apache.curator:curator-client</include>
+                                <include>org.apache.curator:curator-recipes</include>
+                                <include>commons-codec:commons-codec</include>
+                            </includes>
+                        </artifactSet>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

@@ -81,7 +81,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   @Override
   public void start() {
     // Read the globalKafkaOffsets from the last commit file
-    kafkaControlClient.registerPartitionLeader(this);
+    kafkaControlClient.registerTransactionCoordinator(this);
     initializeGlobalCommittedKafkaOffsets();
     // Submit the first start commit
     scheduler.schedule(() -> {
@@ -92,7 +92,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
 
   @Override
   public void stop() {
-    kafkaControlClient.deregisterPartitionLeader(this);
+    kafkaControlClient.deregisterTransactionCoordinator(this);
     scheduler.shutdownNow();
     if (executorService != null) {
       boolean terminated = false;
@@ -124,7 +124,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     if (message.getMsgType().equals(ControlEvent.MsgType.WRITE_STATUS)) {
       type = CoordinatorEvent.CoordinatorEventType.WRITE_STATUS;
     } else {
-      LOG.warn("The leader should not be receiving messages of type {}", message.getMsgType().name());
+      LOG.warn("The Coordinator should not be receiving messages of type {}", message.getMsgType().name());
       return;
     }
     CoordinatorEvent event = new CoordinatorEvent(type, message.getCommitTime());
@@ -143,6 +143,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
             && (event.getCommitTime() != currentCommitTime))) {
           continue;
         }
+
         switch (event.getEventType()) {
           case START_COMMIT:
             startNewCommit();
@@ -166,10 +167,10 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
             handleWriteStatusTimeout();
             break;
           default:
-            throw new IllegalStateException("Partition Leader has received an illegal event type " + event.getEventType().name());
+            throw new IllegalStateException("Partition Coordinator has received an illegal event type " + event.getEventType().name());
         }
       } catch (Exception exception) {
-        LOG.warn("Error recieved while polling the event loop in Partition Leader", exception);
+        LOG.warn("Error recieved while polling the event loop in Partition Coordinator", exception);
       }
     }
   }
