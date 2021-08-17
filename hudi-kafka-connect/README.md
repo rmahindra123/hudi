@@ -47,7 +47,16 @@ Start the ZK and Kafka:
 
 Wait until the kafka cluster is up and running.
 
-### 2 - Create the Hudi Topic for the sink and insert data into the topic
+### 2 - Create the Hudi Control Topic for Coordination of the transactions
+
+The control topic should only have `1` partition
+
+```bash
+./bin/kafka-topics.sh --delete --topic hudi-control-topic --bootstrap-server localhost:9092
+./bin/kafka-topics.sh --create --topic hudi-control-topic --partitions 1 --replication-factor 1 --bootstrap-server localhost:9092
+```
+
+### 3 - Create the Hudi Topic for the Sink and insert data into the topic
 
 Open a terminal to execute the following command:
 
@@ -55,7 +64,7 @@ Open a terminal to execute the following command:
 bash runKafkaTrafficGenerator.sh <total_messages>
 ```
 
-### 4 - Run the sinc connector worker (multiple workers can be run)
+### 4 - Run the Sink connector worker (multiple workers can be run)
 
 Open a terminal to execute the following command:
 
