@@ -87,24 +87,24 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
   }
 
   @Override
-  public void registerPartitionLeader(TransactionCoordinator leader) {
+  public void registerTransactionCoordinator(TransactionCoordinator leader) {
     transactionCoordinator = leader;
   }
 
   @Override
-  public void registerPartitionWorker(TransactionParticipant worker) {
+  public void registerTransactionParticipant(TransactionParticipant worker) {
     partitionWorkers.add(worker);
   }
 
   @Override
-  public void deregisterPartitionLeader(TransactionCoordinator leader) {
+  public void deregisterTransactionCoordinator(TransactionCoordinator leader) {
     if (leader.equals(transactionCoordinator)) {
       transactionCoordinator = null;
     }
   }
 
   @Override
-  public void deregisterPartitionWorker(TransactionParticipant worker) {
+  public void deregisterTransactionParticipant(TransactionParticipant worker) {
     if (worker != null) {
       partitionWorkers.remove(worker);
     }

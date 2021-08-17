@@ -68,13 +68,13 @@ public class HudiTransactionParticipant implements TransactionParticipant {
   @Override
   public void start() {
     LOG.error("Start Hudi Transaction Follower for partition " + partition.partition());
-    this.kafkaControlAgent.registerPartitionWorker(this);
+    this.kafkaControlAgent.registerTransactionParticipant(this);
     context.pause(partition);
   }
 
   @Override
   public void stop() {
-    this.kafkaControlAgent.deregisterPartitionWorker(this);
+    this.kafkaControlAgent.deregisterTransactionParticipant(this);
     cleanupOngoingTransaction();
   }
 

@@ -34,6 +34,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Properties;
 
+/**
+ * Kafka producer to send events to the
+ * Control Topic that coordinates transactions
+ * across Participants.
+ */
 public class KafkaControlProducer {
 
   private static final Logger LOG = LoggerFactory.getLogger(KafkaControlProducer.class);
@@ -70,6 +75,7 @@ public class KafkaControlProducer {
   public void publishMessage(ControlEvent message) {
     ProducerRecord<String, ControlEvent> record
         = new ProducerRecord<>(controlTopicName, message.key(), message);
+    LOG.error("SENDING KAFKA CONTROL MSG " + record.key() + " " + record.topic());
     producer.send(record);
   }
 
