@@ -51,17 +51,18 @@ public class HudiCowWriter implements RecordWriter {
   private HoodieJavaWriteClient hoodieJavaWriteClient;
 
   public HudiCowWriter() {
-    String tablePath = "file:///tmp/raj";
-    String tableName = "raj";
+    String tablePath = "file:///tmp/hoodie/sample-table";
+    String tableName = "hoodie_rt";
     Configuration hadoopConf = new Configuration();
+    hadoopConf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
     // initialize the table, if not done already
     Path path = new Path(tablePath);
-    FileSystem fs = FSUtils.getFs(tablePath, hadoopConf);
     try {
+      FileSystem fs = FSUtils.getFs(tablePath, hadoopConf);
       if (!fs.exists(path)) {
         LOG.error("WNI YES");
         HoodieTableMetaClient.withPropertyBuilder()
-            .setTableType(HoodieTableType.COPY_ON_WRITE)
+            .setTableType(HoodieTableType.COPY_ON_WRITE.name())
             .setTableName(tableName)
             .setPayloadClassName(HoodieAvroPayload.class.getName())
             .initTable(hadoopConf, tablePath);
@@ -80,8 +81,8 @@ public class HudiCowWriter implements RecordWriter {
       // inserts
       String newCommitTime = hoodieJavaWriteClient.startCommit();
       LOG.info("Starting commit " + newCommitTime);
-    } catch (Exception exception) {
-      LOG.error("WNI OMG OMG", exception);
+    } catch (Exception exc) {
+      LOG.error("WNI WNI OMG OMG ", exc);
     }
   }
 
