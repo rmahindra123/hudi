@@ -38,6 +38,7 @@ public class SimpleFileWriter implements RecordWriter {
 
   private final FileOutputStream fos;
   private final TopicPartition partition;
+  private HudiCowWriter cowWriter;
 
   public SimpleFileWriter(TopicPartition partition, long commitTime) throws FileNotFoundException {
     File file = new File(BASE_PATH,
@@ -45,7 +46,7 @@ public class SimpleFileWriter implements RecordWriter {
     fos = new FileOutputStream(file.getPath(), true);
     this.partition = partition;
     if (partition.partition() == 1) {
-      HudiCowWriter cowWriter = new HudiCowWriter();
+      cowWriter = new HudiCowWriter();
     }
   }
 
@@ -53,6 +54,14 @@ public class SimpleFileWriter implements RecordWriter {
   public void write(SinkRecord record) throws IOException {
     fos.write(new ObjectMapper().writeValueAsBytes(record.value()));
     fos.write(NEWLINE_ASCII);
+
+    if (cowWriter != null) {
+      try {
+        cowWriter.write(record);
+      } catch (Exception exception) {
+        LOG.error("WNI HUDI OMG ERROR WRITING RECORD", exception);
+      }
+    }
   }
 
   public TopicPartition topicPartition() {

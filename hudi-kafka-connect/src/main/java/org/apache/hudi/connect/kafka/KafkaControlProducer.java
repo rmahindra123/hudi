@@ -75,22 +75,21 @@ public class KafkaControlProducer {
   public void publishMessage(ControlEvent message) {
     ProducerRecord<String, ControlEvent> record
         = new ProducerRecord<>(controlTopicName, message.key(), message);
-    LOG.error("SENDING KAFKA CONTROL MSG " + record.key() + " " + record.topic());
     producer.send(record);
   }
 
-  public static class KafkaJsonSerializer implements Serializer {
+  public static class KafkaJsonSerializer implements Serializer<ControlEvent> {
 
     private static final Logger LOG = LoggerFactory.getLogger(KafkaJsonSerializer.class);
 
     @Override
-    public byte[] serialize(String s, Object o) {
+    public byte[] serialize(String topic, ControlEvent data) {
       byte[] retVal = null;
       ObjectMapper objectMapper = new ObjectMapper();
       objectMapper.setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY);
 
       try {
-        retVal = objectMapper.writeValueAsBytes(o);
+        retVal = objectMapper.writeValueAsBytes(data);
       } catch (Exception e) {
         LOG.error("Fatal error during serialization of Kafka Control Message ", e);
       }
