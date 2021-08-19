@@ -138,7 +138,7 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
         records = consumer.poll(Duration.ofMillis(KAFKA_POLL_TIMEOUT_MS));
         for (ConsumerRecord<String, ControlEvent> record : records) {
           try {
-            LOG.debug("Kakfa consumerGroupId = {} topic = {}, partition = {}, offset = {}, customer = {}, country = {}",
+            LOG.debug("Kafka consumerGroupId = {} topic = {}, partition = {}, offset = {}, customer = {}, country = {}",
                 "", record.topic(), record.partition(), record.offset(),
                 record.key(), record.value());
             ControlEvent message = record.value();

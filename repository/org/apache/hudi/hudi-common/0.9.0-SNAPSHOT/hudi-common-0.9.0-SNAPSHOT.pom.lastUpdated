@@ -1,8 +1,8 @@
 #NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
-#Wed Aug 18 12:58:18 PDT 2021
-https\://repository.apache.org/snapshots/.lastUpdated=1629316698224
-https\://packages.confluent.io/maven/.lastUpdated=1629316697902
-https\://repository.apache.org/snapshots/.error=
+#Thu Aug 19 10:17:32 PDT 2021
+https\://repository.apache.org/snapshots/.lastUpdated=1629393452181
+https\://packages.confluent.io/maven/.lastUpdated=1629393451823
 https\://packages.confluent.io/maven/.error=
-https\://public.nexus.pentaho.org/repository/proxy-public-3rd-party-release/.lastUpdated=1629316698046
+https\://repository.apache.org/snapshots/.error=
+https\://public.nexus.pentaho.org/repository/proxy-public-3rd-party-release/.lastUpdated=1629393452008
 https\://public.nexus.pentaho.org/repository/proxy-public-3rd-party-release/.error=

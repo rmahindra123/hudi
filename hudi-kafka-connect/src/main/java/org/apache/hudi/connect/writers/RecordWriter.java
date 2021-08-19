@@ -18,9 +18,12 @@
 
 package org.apache.hudi.connect.writers;
 
+import org.apache.hudi.client.WriteStatus;
+
 import org.apache.kafka.connect.sink.SinkRecord;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Provides an interface to write individual
@@ -30,6 +33,8 @@ import java.io.IOException;
 public interface RecordWriter {
 
   void write(SinkRecord record, String currentCommitTime) throws IOException;
+
+  List<WriteStatus> getWriteStatuses();
 
   void close() throws IOException;
 }

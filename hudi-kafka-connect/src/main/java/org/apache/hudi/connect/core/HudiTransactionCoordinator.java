@@ -18,6 +18,8 @@
 
 package org.apache.hudi.connect.core;
 
+import org.apache.hudi.client.WriteStatus;
+import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
 import org.apache.hudi.connect.writers.HudiCowWriter;
@@ -29,9 +31,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,7 +50,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   private static final Logger LOG = LoggerFactory.getLogger(HudiTransactionCoordinator.class);
   private static final int START_COMMIT_INIT_DELAY_MS = 100;
   private static final int COMMIT_INTERVAL_MINS = 1;
-  private static final int WRITE_STATUS_TIMEOUT_SECS = 30;
+  private static final int WRITE_STATUS_TIMEOUT_SECS = 60;
 
   private final String taskId;
   private final TopicPartition partition;
@@ -61,7 +62,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
 
   private String currentCommitTime;
   private int numPartitions;
-  private Set<Integer> partitionsWriteStatusReceived;
+  private Map<Integer, List<WriteStatus>> partitionsWriteStatusReceived;
   private Map<Integer, Long> globalCommittedKafkaOffsets;
   private Map<Integer, Long> currentConsumedKafkaOffsets;
   private State currentState;
@@ -75,7 +76,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     this.executorService = Executors.newSingleThreadExecutor();
     this.scheduler = Executors.newSingleThreadScheduledExecutor();
     this.currentCommitTime = StringUtils.EMPTY_STRING;
-    this.partitionsWriteStatusReceived = new HashSet<>();
+    this.partitionsWriteStatusReceived = new HashMap<>();
     this.globalCommittedKafkaOffsets = new HashMap<>();
     this.currentConsumedKafkaOffsets = new HashMap<>();
     this.currentState = State.INIT;
@@ -144,7 +145,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
         // Ignore NULL and STALE events, unless its one to start a new COMMIT
         if (event == null
             || (!event.getEventType().equals(CoordinatorEvent.CoordinatorEventType.START_COMMIT)
-            && (event.getCommitTime() != currentCommitTime))) {
+            && (!event.getCommitTime().equals(currentCommitTime)))) {
           continue;
         }
 
@@ -194,7 +195,8 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     // schedule a timeout for ending the current commit
     scheduler.schedule(() -> {
       events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.END_COMMIT, currentCommitTime));
-    }, COMMIT_INTERVAL_MINS, TimeUnit.MINUTES);
+      //   }, COMMIT_INTERVAL_MINS, TimeUnit.MINUTES);
+    }, 15, TimeUnit.SECONDS);
   }
 
   private void endExistingCommit() {
@@ -219,7 +221,8 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     ControlEvent.ParticipantInfo participantInfo = message.getParticipantInfo();
     if (participantInfo.getOutcomeType().equals(ControlEvent.OutcomeType.WRITE_SUCCESS)) {
       int partition = message.getSenderPartition();
-      partitionsWriteStatusReceived.add(partition);
+      List<WriteStatus> writeStatuses = SerializationUtils.deserialize(participantInfo.getWriteStatusList());
+      partitionsWriteStatusReceived.put(partition, writeStatuses);
       currentConsumedKafkaOffsets.put(partition, participantInfo.getKafkaCommitOffset());
     }
     if (partitionsWriteStatusReceived.size() >= numPartitions
@@ -227,6 +230,11 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
       // Commit the kafka offsets to the commit file
       try {
         commitFile(currentConsumedKafkaOffsets);
+        List<WriteStatus> allWriteStatuses = new ArrayList<>();
+        partitionsWriteStatusReceived.forEach((key, value) -> allWriteStatuses.addAll(value));
+        // Commit hudi
+        hudiCowWriter.endCommit(currentCommitTime, allWriteStatuses);
+
         globalCommittedKafkaOffsets.putAll(currentConsumedKafkaOffsets);
         currentState = State.WRITE_STATUS_RCVD;
         events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.ACK_COMMIT, currentCommitTime));

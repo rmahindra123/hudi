@@ -18,6 +18,8 @@
 
 package org.apache.hudi.connect.writers;
 
+import org.apache.hudi.client.WriteStatus;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -28,6 +30,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 public class SimpleFileWriter implements RecordWriter {
 
@@ -60,6 +63,11 @@ public class SimpleFileWriter implements RecordWriter {
         LOG.error("WNI HUDI OMG ERROR WRITING RECORD", exception);
       }
     }
+  }
+
+  @Override
+  public List<WriteStatus> getWriteStatuses() {
+    return cowWriter.getWriteStatuses();
   }
 
   public TopicPartition topicPartition() {
