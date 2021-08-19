@@ -23,13 +23,13 @@ import org.apache.hudi.connect.writers.WriteStatus;
 
 public class TransactionInfo {
 
-  private final long commitTime;
+  private final String commitTime;
   private final WriteStatus writeStatus;
   private final RecordWriter writer;
   private long lastWrittenKafkaOffset;
   private boolean commitInitiated;
 
-  public TransactionInfo(long commitTime, WriteStatus writeStatus, RecordWriter writer) {
+  public TransactionInfo(String commitTime, WriteStatus writeStatus, RecordWriter writer) {
     this.commitTime = commitTime;
     this.writeStatus = writeStatus;
     this.writer = writer;
@@ -37,7 +37,7 @@ public class TransactionInfo {
     this.commitInitiated = false;
   }
 
-  public long getCommitTime() {
+  public String getCommitTime() {
     return commitTime;
   }
 

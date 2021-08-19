@@ -33,22 +33,28 @@ import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.index.HoodieIndex;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.avro.Schema;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class HudiCowWriter implements RecordWriter {
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiCowWriter.class);
+  private static final String TABLE_PATH = "file:///tmp/hoodie/sample-table";
+  private static final String TABLE_NAME = "hoodie_rt";
   private static final String SCHEMA = "{\n" +
       "  \"name\": \"MyClass\",\n" +
       "  \"type\": \"record\",\n" +
@@ -105,57 +111,82 @@ public class HudiCowWriter implements RecordWriter {
       "  ]\n" +
       "}";
 
+  private final JsonConverter jsonConverter;
+  private final ObjectMapper mapper;
   private HoodieJavaWriteClient hoodieJavaWriteClient;
-  private String newCommitTime;
 
-  public HudiCowWriter() {
-    String tablePath = "file:///tmp/hoodie/sample-table";
-    String tableName = "hoodie_rt";
+  public HudiCowWriter(int partition, boolean initTable) {
     Configuration hadoopConf = new Configuration();
     hadoopConf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-    // initialize the table, if not done already
-    Path path = new Path(tablePath);
-    try {
-      FileSystem fs = FSUtils.getFs(tablePath, hadoopConf);
-      if (!fs.exists(path)) {
-        LOG.error("WNI YES");
-        HoodieTableMetaClient.withPropertyBuilder()
-            .setTableType(HoodieTableType.COPY_ON_WRITE.name())
-            .setTableName(tableName)
-            .setPayloadClassName(HoodieAvroPayload.class.getName())
-            .initTable(hadoopConf, tablePath);
-      }
 
+    if (initTable) {
+      try {
+        // initialize the table, if not done already
+        Path path = new Path(TABLE_PATH);
+        FileSystem fs = FSUtils.getFs(TABLE_PATH, hadoopConf);
+        if (!fs.exists(path)) {
+          LOG.error("WNI YES");
+          HoodieTableMetaClient.withPropertyBuilder()
+              .setTableType(HoodieTableType.COPY_ON_WRITE.name())
+              .setTableName(TABLE_NAME)
+              .setPayloadClassName(HoodieAvroPayload.class.getName())
+              .initTable(hadoopConf, TABLE_PATH);
+        }
+      } catch (Exception exception) {
+        LOG.error("Fatal error initializing Table", exception);
+      }
+    }
+
+    try {
       // Create the write client to write some records in
-      HoodieWriteConfig cfg = HoodieWriteConfig.newBuilder().withPath(tablePath)
+      HoodieWriteConfig cfg = HoodieWriteConfig.newBuilder().withPath(TABLE_PATH)
           .withSchema(SCHEMA)
-          .withParallelism(2, 2)
-          .withDeleteParallelism(2).forTable(tableName)
+          .withParallelism(2, 2).withDeleteParallelism(2)
+          .withAutoCommit(false)
+          .forTable(TABLE_NAME)
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(HoodieIndex.IndexType.INMEMORY).build())
           .withCompactionConfig(HoodieCompactionConfig.newBuilder().archiveCommitsWith(20, 30).build()).build();
+      HoodieJavaEngineContext context = new HoodieJavaEngineContext(hadoopConf);
+      context.setKafkaPartition(String.valueOf(partition));
       hoodieJavaWriteClient =
-          new HoodieJavaWriteClient<>(new HoodieJavaEngineContext(hadoopConf), cfg);
-
-      // inserts
-      newCommitTime = hoodieJavaWriteClient.startCommit();
-      LOG.info("WNI Starting commit " + newCommitTime);
+          new HoodieJavaWriteClient<>(context, cfg);
     } catch (Exception exc) {
-      LOG.error("WNI WNI OMG OMG ", exc);
+      LOG.error("WNI WNI OMG ", exc);
     }
+
+    jsonConverter = new JsonConverter();
+    Map<String, Object> converterConfig = new HashMap<>();
+    converterConfig.put("schemas.enable", "false");
+    jsonConverter.configure(converterConfig, false);
+    mapper = new ObjectMapper();
+  }
+
+  public String startCommit() {
+    String newCommitTime = hoodieJavaWriteClient.startCommit();
+    LOG.info("WNI Starting commit " + newCommitTime);
+    return newCommitTime;
+  }
+
+  public void endCommit(String commitTime) {
+    LOG.info("WNI Ending commit " + commitTime);
+    //hoodieJavaWriteClient.commit();
   }
 
   @Override
-  public void write(SinkRecord record) throws IOException {
+  public void write(SinkRecord record, String commitTime) throws IOException {
     String partitionPath = record.topic();
-    HoodieKey key = new HoodieKey(UUID.randomUUID().toString(), partitionPath);
     MercifulJsonConverter converter = new MercifulJsonConverter();
+    String jsonRecord = mapper.writeValueAsString(record.value());
+
     Schema.Parser parser = new Schema.Parser();
     GenericRecord avroRecord =
-        converter.convert(record.value().toString(), parser.parse(SCHEMA));
+        converter.convert(jsonRecord, parser.parse(SCHEMA));
+
+    HoodieKey key = new HoodieKey(UUID.randomUUID().toString(), partitionPath);
     HoodieRecord hudiRecord = new HoodieRecord(key,
         new HoodieAvroPayload(Option.of(avroRecord)));
 
-    hoodieJavaWriteClient.insert(Collections.singletonList(hudiRecord), newCommitTime);
+    hoodieJavaWriteClient.insertPreppedRecords(Collections.singletonList(hudiRecord), commitTime);
   }
 
   @Override

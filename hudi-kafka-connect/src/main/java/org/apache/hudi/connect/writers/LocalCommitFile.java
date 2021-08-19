@@ -43,13 +43,13 @@ public class LocalCommitFile implements Serializable {
   private static final String COMMIT_FILE_EXT = "commit";
   private static final Logger LOG = LoggerFactory.getLogger(LocalCommitFile.class);
 
-  private final long commitTime;
+  private final String commitTime;
   private final int numPartitions;
   private final List<String> filesWritten;
   private final Map<Integer, Long> kafkaOffsets;
   private final String filepath;
 
-  public LocalCommitFile(long commitTime, int numPartitions, List<String> filesWritten, String topicName, Map<Integer, Long> kafkaOffsets) {
+  public LocalCommitFile(String commitTime, int numPartitions, List<String> filesWritten, String topicName, Map<Integer, Long> kafkaOffsets) {
     this.commitTime = commitTime;
     this.numPartitions = numPartitions;
     this.filesWritten = filesWritten;
@@ -59,7 +59,7 @@ public class LocalCommitFile implements Serializable {
     filepath = commitFile.getPath();
   }
 
-  public long getCommitTime() {
+  public String getCommitTime() {
     return commitTime;
   }
 

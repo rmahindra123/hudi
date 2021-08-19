@@ -1,0 +1,8 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Wed Aug 18 12:58:21 PDT 2021
+https\://repository.apache.org/snapshots/.lastUpdated=1629316701269
+https\://packages.confluent.io/maven/.lastUpdated=1629316700971
+https\://repository.apache.org/snapshots/.error=
+https\://packages.confluent.io/maven/.error=
+https\://public.nexus.pentaho.org/repository/proxy-public-3rd-party-release/.lastUpdated=1629316701094
+https\://public.nexus.pentaho.org/repository/proxy-public-3rd-party-release/.error=

@@ -22,12 +22,12 @@ import java.util.List;
 
 public class WriteStatus {
 
-  private final long commitTime;
+  private final String commitTime;
   private int numRecords;
   private List<String> fileNames;
   private boolean isSuccess;
 
-  public WriteStatus(long commitTime) {
+  public WriteStatus(String commitTime) {
     this.commitTime = commitTime;
     this.numRecords = 0;
   }
@@ -49,7 +49,7 @@ public class WriteStatus {
     isSuccess = success;
   }
 
-  public long getCommitTime() {
+  public String getCommitTime() {
     return commitTime;
   }
 
