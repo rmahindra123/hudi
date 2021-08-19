@@ -18,9 +18,10 @@
 
 package org.apache.hudi.connect.core;
 
+import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.connect.writers.SimpleFileWriter;
 import org.apache.hudi.connect.kafka.KafkaControlAgent;
-import org.apache.hudi.connect.writers.WriteStatus;
+import org.apache.hudi.connect.writers.TransactionWriteStatus;
 
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -134,7 +135,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     String currentCommitTime = message.getCommitTime();
     try {
       SimpleFileWriter writer = new SimpleFileWriter(partition, currentCommitTime);
-      ongoingTransactionInfo = new TransactionInfo(currentCommitTime, new WriteStatus(currentCommitTime), writer);
+      ongoingTransactionInfo = new TransactionInfo(currentCommitTime, new TransactionWriteStatus(currentCommitTime), writer);
       ongoingTransactionInfo.setLastWrittenKafkaOffset(committedKafkaOffset);
     } catch (Exception exception) {
       LOG.warn("Error received while starting a new transaction", exception);
@@ -145,7 +146,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     if (ongoingTransactionInfo == null) {
       LOG.warn("END_COMMIT {} is received while we were NOT in active transaction", message.getCommitTime());
       return;
-    } else if (ongoingTransactionInfo.getCommitTime() != message.getCommitTime()) {
+    } else if (!ongoingTransactionInfo.getCommitTime().equals(message.getCommitTime())) {
       LOG.error("Fatal error received END_COMMIT with commit time {} while local transaction commit time {}",
           message.getCommitTime(), ongoingTransactionInfo.getCommitTime());
       // Recovery: A new END_COMMIT from leader caused interruption to an existing transaction,
@@ -160,10 +161,19 @@ public class HudiTransactionParticipant implements TransactionParticipant {
       context.pause(partition);
       ongoingTransactionInfo.commitInitiated();
       //sendWriterStatus
+      byte[] writeStatuses = new byte[0];
+      try {
+        writeStatuses = SerializationUtils.serialize(
+            ongoingTransactionInfo.getWriter().getWriteStatuses());
+      } catch (IOException exception) {
+        LOG.error("WNI OMG OMG SERIALIZATION ERROR", exception);
+      }
+
       ControlEvent writeStatus = new ControlEvent.Builder(ControlEvent.MsgType.WRITE_STATUS,
           ongoingTransactionInfo.getCommitTime(),
           partition.partition())
           .setParticipantInfo(new ControlEvent.ParticipantInfo(
+              writeStatuses,
               ongoingTransactionInfo.getLastWrittenKafkaOffset(),
               ControlEvent.OutcomeType.WRITE_SUCCESS))
           .build();

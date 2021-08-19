@@ -183,7 +183,6 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
               recordsPerBucket.add(totalUnassignedInserts - (insertBuckets - 1) * insertRecordsPerBucket);
             }
             // To do add Kafka Partition here
-            HoodieJavaEngineContext javaContext = (HoodieJavaEngineContext) context;
             BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, ((HoodieJavaEngineContext) context).getKafkaPartition() + "-" + FSUtils.createNewFileIdPfx(), partitionPath);
             bucketInfoMap.put(totalBuckets, bucketInfo);
             totalBuckets++;

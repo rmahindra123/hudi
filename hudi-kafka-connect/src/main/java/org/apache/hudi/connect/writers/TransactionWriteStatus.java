@@ -20,19 +20,19 @@ package org.apache.hudi.connect.writers;
 
 import java.util.List;
 
-public class WriteStatus {
+public class TransactionWriteStatus {
 
   private final String commitTime;
   private int numRecords;
   private List<String> fileNames;
   private boolean isSuccess;
 
-  public WriteStatus(String commitTime) {
+  public TransactionWriteStatus(String commitTime) {
     this.commitTime = commitTime;
     this.numRecords = 0;
   }
 
-  public WriteStatus incrementRecordsWritten() {
+  public TransactionWriteStatus incrementRecordsWritten() {
     this.numRecords++;
     return this;
   }

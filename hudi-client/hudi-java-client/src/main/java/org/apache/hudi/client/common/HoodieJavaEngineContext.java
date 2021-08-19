@@ -46,6 +46,7 @@ import static org.apache.hudi.common.function.FunctionWrapper.throwingMapWrapper
  */
 public class HoodieJavaEngineContext extends HoodieEngineContext {
 
+  // ToDo add to a config or reuse HoodieWriteConfig?
   private String kafkaPartition;
 
   public HoodieJavaEngineContext(Configuration conf) {

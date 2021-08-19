@@ -18,8 +18,18 @@
 
 package org.apache.hudi.connect.core;
 
+import org.apache.hudi.client.WriteStatus;
+import org.apache.hudi.common.util.SerializationUtils;
+import org.apache.hudi.common.util.collection.BitCaskDiskMap;
+
+import org.apache.log4j.LogManager;
+import org.apache.log4j.Logger;
+
+import java.io.IOException;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -30,6 +40,8 @@ import java.util.Map;
  */
 @SuppressWarnings("checkstyle:VisibilityModifier")
 public class ControlEvent implements Serializable {
+
+  private static final Logger LOG = LogManager.getLogger(BitCaskDiskMap.class);
 
   private MsgType msgType;
   private String commitTime;
@@ -130,7 +142,6 @@ public class ControlEvent implements Serializable {
 
     public Map<Integer, Long> getGlobalKafkaCommitOffsets() {
       return (globalKafkaCommitOffsets == null) ? new HashMap<>() : globalKafkaCommitOffsets;
-
     }
   }
 
@@ -140,15 +151,21 @@ public class ControlEvent implements Serializable {
    */
   public static class ParticipantInfo implements Serializable {
 
+    private byte[] writeStatusList;
     private long kafkaCommitOffset;
     private OutcomeType outcomeType;
 
     public ParticipantInfo() {
     }
 
-    public ParticipantInfo(long kafkaCommitOffset, OutcomeType outcomeType) {
+    public ParticipantInfo(byte[] writeStatusList, long kafkaCommitOffset, OutcomeType outcomeType) {
+      this.writeStatusList = writeStatusList;
       this.kafkaCommitOffset = kafkaCommitOffset;
       this.outcomeType = outcomeType;
+    }
+
+    public byte[] getWriteStatusList() {
+      return writeStatusList;
     }
 
     public long getKafkaCommitOffset() {
