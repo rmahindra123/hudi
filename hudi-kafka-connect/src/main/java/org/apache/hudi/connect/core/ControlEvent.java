@@ -32,7 +32,7 @@ import java.util.Map;
 public class ControlEvent implements Serializable {
 
   private MsgType msgType;
-  private long commitTime;
+  private String commitTime;
   private int senderPartition;
   private CoordinatorInfo coordinatorInfo;
   private ParticipantInfo participantInfo;
@@ -41,7 +41,7 @@ public class ControlEvent implements Serializable {
   }
 
   public ControlEvent(MsgType msgType,
-                      long commitTime,
+                      String commitTime,
                       int senderPartition,
                       CoordinatorInfo coordinatorInfo,
                       ParticipantInfo participantInfo) {
@@ -60,7 +60,7 @@ public class ControlEvent implements Serializable {
     return msgType;
   }
 
-  public long getCommitTime() {
+  public String getCommitTime() {
     return commitTime;
   }
 
@@ -87,12 +87,12 @@ public class ControlEvent implements Serializable {
   public static class Builder {
 
     private final MsgType msgType;
-    private final long commitTime;
+    private final String commitTime;
     private final int senderPartition;
     private CoordinatorInfo coordinatorInfo;
     private ParticipantInfo participantInfo;
 
-    public Builder(MsgType msgType, long commitTime, int senderPartition) {
+    public Builder(MsgType msgType, String commitTime, int senderPartition) {
       this.msgType = msgType;
       this.commitTime = commitTime;
       this.senderPartition = senderPartition;

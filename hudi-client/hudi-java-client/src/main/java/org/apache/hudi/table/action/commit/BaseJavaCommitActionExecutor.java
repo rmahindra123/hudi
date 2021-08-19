@@ -61,6 +61,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload> extends
@@ -110,6 +111,7 @@ public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload
     }
 
     final Partitioner partitioner = getPartitioner(profile);
+
     Map<Integer, List<HoodieRecord<T>>> partitionedRecords = partition(inputRecords, partitioner);
 
     List<WriteStatus> writeStatuses = new LinkedList<>();
@@ -147,6 +149,10 @@ public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload
   }
 
   private Map<Integer, List<HoodieRecord<T>>> partition(List<HoodieRecord<T>> dedupedRecords, Partitioner partitioner) {
+
+    HoodieKey tempKey = dedupedRecords.get(0).getKey();
+    System.out.println("WNI HMMM HMM  " + tempKey.getRecordKey() + " " + tempKey.getPartitionPath());
+
     Map<Integer, List<Pair<Pair<HoodieKey, Option<HoodieRecordLocation>>, HoodieRecord<T>>>> partitionedMidRecords = dedupedRecords
         .stream()
         .map(record -> Pair.of(Pair.of(record.getKey(), Option.ofNullable(record.getCurrentLocation())), record))
@@ -231,6 +237,8 @@ public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload
     JavaUpsertPartitioner javaUpsertPartitioner = (JavaUpsertPartitioner) partitioner;
     BucketInfo binfo = javaUpsertPartitioner.getBucketInfo(partition);
     BucketType btype = binfo.bucketType;
+
+    System.out.println("WNI handleUpsertPartition BucketInfo " + binfo.toString());
     try {
       if (btype.equals(BucketType.INSERT)) {
         return handleInsert(binfo.fileIdPrefix, recordItr);

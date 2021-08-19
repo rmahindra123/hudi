@@ -46,6 +46,8 @@ import static org.apache.hudi.common.function.FunctionWrapper.throwingMapWrapper
  */
 public class HoodieJavaEngineContext extends HoodieEngineContext {
 
+  private String kafkaPartition;
+
   public HoodieJavaEngineContext(Configuration conf) {
     this(conf, new JavaTaskContextSupplier());
   }
@@ -89,5 +91,13 @@ public class HoodieJavaEngineContext extends HoodieEngineContext {
   @Override
   public void setJobStatus(String activeModule, String activityDescription) {
     // no operation for now
+  }
+
+  public void setKafkaPartition(String partition) {
+    kafkaPartition = partition;
+  }
+
+  public String getKafkaPartition() {
+    return kafkaPartition;
   }
 }

@@ -18,7 +18,9 @@
 
 package org.apache.hudi.connect.core;
 
+import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
+import org.apache.hudi.connect.writers.HudiCowWriter;
 import org.apache.hudi.connect.writers.LocalCommitFile;
 
 import org.apache.kafka.common.TopicPartition;
@@ -55,8 +57,9 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   private final HudiKafkaControlAgent kafkaControlClient;
   private final BlockingQueue<CoordinatorEvent> events;
   private final ExecutorService executorService;
+  private final HudiCowWriter hudiCowWriter;
 
-  private long currentCommitTime;
+  private String currentCommitTime;
   private int numPartitions;
   private Set<Integer> partitionsWriteStatusReceived;
   private Map<Integer, Long> globalCommittedKafkaOffsets;
@@ -71,11 +74,12 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     this.events = new LinkedBlockingQueue<>();
     this.executorService = Executors.newSingleThreadExecutor();
     this.scheduler = Executors.newSingleThreadScheduledExecutor();
-    this.currentCommitTime = -1;
+    this.currentCommitTime = StringUtils.EMPTY_STRING;
     this.partitionsWriteStatusReceived = new HashSet<>();
     this.globalCommittedKafkaOffsets = new HashMap<>();
     this.currentConsumedKafkaOffsets = new HashMap<>();
     this.currentState = State.INIT;
+    this.hudiCowWriter = new HudiCowWriter(-1, true);
   }
 
   @Override
@@ -85,7 +89,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     initializeGlobalCommittedKafkaOffsets();
     // Submit the first start commit
     scheduler.schedule(() -> {
-      events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT, -1));
+      events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT, StringUtils.EMPTY_STRING));
     }, START_COMMIT_INIT_DELAY_MS, TimeUnit.MILLISECONDS);
     executorService.submit(this);
   }
@@ -177,7 +181,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
 
   private void startNewCommit() {
     partitionsWriteStatusReceived.clear();
-    currentCommitTime = System.currentTimeMillis();
+    currentCommitTime = hudiCowWriter.startCommit();
     ControlEvent message = new ControlEvent.Builder(
         ControlEvent.MsgType.START_COMMIT,
         currentCommitTime,
@@ -239,7 +243,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
       LOG.warn("Did not receive the Write Status from all partitions");
       // Submit the next start commit
       scheduler.schedule(() -> {
-        events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT, -1));
+        events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT, StringUtils.EMPTY_STRING));
       }, 100, TimeUnit.MILLISECONDS);
     }
   }
@@ -257,7 +261,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
 
     // Submit the next start commit
     scheduler.schedule(() -> {
-      events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT, -1));
+      events.add(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT, StringUtils.EMPTY_STRING));
     }, 100, TimeUnit.MILLISECONDS);
   }
 

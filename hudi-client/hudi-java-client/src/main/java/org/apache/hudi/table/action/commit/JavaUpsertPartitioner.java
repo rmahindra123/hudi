@@ -18,6 +18,7 @@
 
 package org.apache.hudi.table.action.commit;
 
+import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieBaseFile;
@@ -172,7 +173,7 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
           }
 
           int insertBuckets = (int) Math.ceil((1.0 * totalUnassignedInserts) / insertRecordsPerBucket);
-          LOG.info("After small file assignment: unassignedInserts => " + totalUnassignedInserts
+          LOG.info("ç small file assignment: unassignedInserts => " + totalUnassignedInserts
               + ", totalInsertBuckets => " + insertBuckets + ", recordsPerBucket => " + insertRecordsPerBucket);
           for (int b = 0; b < insertBuckets; b++) {
             bucketNumbers.add(totalBuckets);
@@ -181,7 +182,9 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
             } else {
               recordsPerBucket.add(totalUnassignedInserts - (insertBuckets - 1) * insertRecordsPerBucket);
             }
-            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, FSUtils.createNewFileIdPfx(), partitionPath);
+            // To do add Kafka Partition here
+            HoodieJavaEngineContext javaContext = (HoodieJavaEngineContext) context;
+            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, ((HoodieJavaEngineContext) context).getKafkaPartition() + "-" + FSUtils.createNewFileIdPfx(), partitionPath);
             bucketInfoMap.put(totalBuckets, bucketInfo);
             totalBuckets++;
           }

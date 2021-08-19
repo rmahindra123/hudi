@@ -29,7 +29,7 @@ import java.io.IOException;
  */
 public interface RecordWriter {
 
-  void write(SinkRecord record) throws IOException;
+  void write(SinkRecord record, String currentCommitTime) throws IOException;
 
   void close() throws IOException;
 }

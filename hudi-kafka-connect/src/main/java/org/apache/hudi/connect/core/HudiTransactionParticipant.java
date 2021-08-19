@@ -131,7 +131,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     // Resync the last committed Kafka offset from the leader
     syncKafkaOffsetWithLeader(message);
     context.resume(partition);
-    long currentCommitTime = message.getCommitTime();
+    String currentCommitTime = message.getCommitTime();
     try {
       SimpleFileWriter writer = new SimpleFileWriter(partition, currentCommitTime);
       ongoingTransactionInfo = new TransactionInfo(currentCommitTime, new WriteStatus(currentCommitTime), writer);
@@ -191,7 +191,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
           SinkRecord record = buffer.peek();
           if (record != null
               && record.kafkaOffset() >= ongoingTransactionInfo.getLastWrittenKafkaOffset()) {
-            ongoingTransactionInfo.getWriter().write(record);
+            ongoingTransactionInfo.getWriter().write(record, ongoingTransactionInfo.getCommitTime());
             ongoingTransactionInfo.setLastWrittenKafkaOffset(record.kafkaOffset() + 1);
           } else if (record != null && record.kafkaOffset() < committedKafkaOffset) {
             LOG.warn("Received a kafka record with offset {} prior to last committed offset {} for partition {}",

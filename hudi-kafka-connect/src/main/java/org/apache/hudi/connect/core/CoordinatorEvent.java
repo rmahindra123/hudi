@@ -26,10 +26,10 @@ package org.apache.hudi.connect.core;
 public class CoordinatorEvent {
 
   private final CoordinatorEventType eventType;
-  private final long commitTime;
+  private final String commitTime;
   private ControlEvent message;
 
-  public CoordinatorEvent(CoordinatorEventType eventType, long commitTime) {
+  public CoordinatorEvent(CoordinatorEventType eventType, String commitTime) {
     this.eventType = eventType;
     this.commitTime = commitTime;
   }
@@ -38,7 +38,7 @@ public class CoordinatorEvent {
     return eventType;
   }
 
-  public long getCommitTime() {
+  public String getCommitTime() {
     return commitTime;
   }
 
