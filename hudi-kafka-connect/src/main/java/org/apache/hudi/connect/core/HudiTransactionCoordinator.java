@@ -22,7 +22,7 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
-import org.apache.hudi.connect.writers.HudiCowWriter;
+import org.apache.hudi.connect.writers.HudiConnectStreamer;
 import org.apache.hudi.connect.writers.LocalCommitFile;
 
 import org.apache.kafka.common.TopicPartition;
@@ -58,7 +58,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   private final HudiKafkaControlAgent kafkaControlClient;
   private final BlockingQueue<CoordinatorEvent> events;
   private final ExecutorService executorService;
-  private final HudiCowWriter hudiCowWriter;
+  private final HudiConnectStreamer hudiConnectStreamer;
 
   private String currentCommitTime;
   private int numPartitions;
@@ -80,7 +80,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     this.globalCommittedKafkaOffsets = new HashMap<>();
     this.currentConsumedKafkaOffsets = new HashMap<>();
     this.currentState = State.INIT;
-    this.hudiCowWriter = new HudiCowWriter(-1, true);
+    this.hudiConnectStreamer = new HudiConnectStreamer(-1, true);
   }
 
   @Override
@@ -182,7 +182,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
 
   private void startNewCommit() {
     partitionsWriteStatusReceived.clear();
-    currentCommitTime = hudiCowWriter.startCommit();
+    currentCommitTime = hudiConnectStreamer.startCommit();
     ControlEvent message = new ControlEvent.Builder(
         ControlEvent.MsgType.START_COMMIT,
         currentCommitTime,
@@ -233,7 +233,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
         List<WriteStatus> allWriteStatuses = new ArrayList<>();
         partitionsWriteStatusReceived.forEach((key, value) -> allWriteStatuses.addAll(value));
         // Commit hudi
-        hudiCowWriter.endCommit(currentCommitTime, allWriteStatuses);
+        hudiConnectStreamer.endCommit(currentCommitTime, allWriteStatuses);
 
         globalCommittedKafkaOffsets.putAll(currentConsumedKafkaOffsets);
         currentState = State.WRITE_STATUS_RCVD;

@@ -41,14 +41,14 @@ public class SimpleFileWriter implements RecordWriter {
 
   private final FileOutputStream fos;
   private final TopicPartition partition;
-  private HudiCowWriter cowWriter;
+  private HudiConnectStreamer cowWriter;
 
   public SimpleFileWriter(TopicPartition partition, String commitTime) throws FileNotFoundException {
     File file = new File(BASE_PATH,
         String.format("%s-%s.%s", partition, commitTime, FILE_EXTENSION));
     fos = new FileOutputStream(file.getPath(), true);
     this.partition = partition;
-    cowWriter = new HudiCowWriter(partition.partition(),false);
+    cowWriter = new HudiConnectStreamer(partition.partition(),false);
   }
 
   @Override
