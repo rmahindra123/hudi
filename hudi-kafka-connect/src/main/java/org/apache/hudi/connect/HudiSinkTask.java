@@ -21,6 +21,7 @@ package org.apache.hudi.connect;
 import org.apache.hudi.connect.core.HudiTransactionCoordinator;
 import org.apache.hudi.connect.core.HudiTransactionParticipant;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
+import org.apache.hudi.connect.writers.HudiConnectConfigs;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -72,7 +73,13 @@ public class HudiSinkTask extends SinkTask {
     taskId = props.get(TASK_ID_CONFIG_NAME);
     LOG.info("Starting Hudi Sink Task for {} connector {} with id {} with assignments {}", props, connectorName, taskId, context.assignment());
     try {
-      HudiSinkConnectorConfig connectorConfig = new HudiSinkConnectorConfig(props);
+      HudiConnectConfigs connectorConfig = HudiConnectConfigs.newBuilder().withProperties(props).build();
+      System.out.println("WNI CONFIGS " + connectorConfig.getControlTopicName() + " "
+      + connectorConfig.getSchemaProviderClass()
+          + connectorConfig.getProps().get("hoodie.deltastreamer.schemaprovider.source.schema.file")
+      + " " + connectorConfig.getHoodieWriteConfig().getBasePath()
+      + " " + connectorConfig.getHoodieWriteConfig().getTableName());
+
       controlKafkaClient = HudiKafkaControlAgent.createKafkaControlManager("localhost:9092", CONTROL_TOPIC_NAME);
       bootstrap(context.assignment());
     } catch (ConfigException e) {

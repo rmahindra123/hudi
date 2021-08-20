@@ -33,17 +33,11 @@ public class HudiSinkConnector extends SinkConnector {
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiSinkConnector.class);
   private Map<String, String> configProps;
-  private HudiSinkConnectorConfig config;
 
   /**
    * No-arg constructor. It is instantiated by Connect framework.
    */
   public HudiSinkConnector() {
-  }
-
-  // Visible for testing.
-  HudiSinkConnector(HudiSinkConnectorConfig config) {
-    this.config = config;
   }
 
   @Override
@@ -54,8 +48,6 @@ public class HudiSinkConnector extends SinkConnector {
   @Override
   public void start(Map<String, String> props) {
     configProps = new HashMap<>(props);
-    config = new HudiSinkConnectorConfig(props);
-    LOG.info("Starting Hudi Sink connector {}", config.getName());
   }
 
   @Override
@@ -75,11 +67,11 @@ public class HudiSinkConnector extends SinkConnector {
 
   @Override
   public void stop() {
-    LOG.info("Shutting down Hudi Sink connector {}", config.getName());
+    LOG.info("Shutting down Hudi Sink connector {}", configProps.get("name"));
   }
 
   @Override
   public ConfigDef config() {
-    return HudiSinkConnectorConfig.getConfig();
+    return null;
   }
 }

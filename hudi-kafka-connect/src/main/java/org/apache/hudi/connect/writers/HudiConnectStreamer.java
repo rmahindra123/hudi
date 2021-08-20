@@ -34,6 +34,7 @@ import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.index.HoodieIndex;
+import org.apache.hudi.utilities.schema.SchemaProvider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.avro.Schema;
@@ -54,11 +55,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class HudiCowWriter implements RecordWriter {
+public class HudiConnectStreamer implements RecordWriter {
 
-  private static final Logger LOG = LoggerFactory.getLogger(HudiCowWriter.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HudiConnectStreamer.class);
   private static final String TABLE_PATH = "file:///tmp/hoodie/sample-table";
   private static final String TABLE_NAME = "hoodie_rt";
+  private final SchemaProvider schemaProvider = null;
   private static final String SCHEMA = "{\n" +
       "  \"name\": \"MyClass\",\n" +
       "  \"type\": \"record\",\n" +
@@ -120,7 +122,10 @@ public class HudiCowWriter implements RecordWriter {
   private final ObjectMapper mapper;
   private HoodieJavaWriteClient hoodieJavaWriteClient;
 
-  public HudiCowWriter(int partition, boolean initTable) {
+  public HudiConnectStreamer(
+      int partition,
+      boolean initTable) {
+      //SchemaProvider schemaProvider) {
     Configuration hadoopConf = new Configuration();
     hadoopConf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
 
@@ -140,6 +145,10 @@ public class HudiCowWriter implements RecordWriter {
         LOG.error("Fatal error initializing Table", exception);
       }
     }
+
+    /*this.schemaProvider = UtilHelpers.wrapSchemaProviderWithPostProcessor(
+        UtilHelpers.createSchemaProvider(cfg.schemaProviderClassName, props, jssc), props, jssc, cfg.transformerClassNames);
+    */
 
     try {
       // Create the write client to write some records in
