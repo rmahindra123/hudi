@@ -30,9 +30,11 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.NumericUtils;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.ImmutablePair;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.WorkloadProfile;
 import org.apache.hudi.table.WorkloadStat;
@@ -40,21 +42,29 @@ import org.apache.hudi.table.WorkloadStat;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
+import javax.xml.bind.DatatypeConverter;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Packs incoming records to be upserted, into buckets.
  */
-public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements Partitioner  {
+public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements Partitioner {
 
   private static final Logger LOG = LogManager.getLogger(JavaUpsertPartitioner.class);
+  public static final String NEW_FILE_ID_PREFIX_KEY = "hoodie.new.fileid.prefix";
 
   /**
    * List of all small files to be corrected.
@@ -182,8 +192,21 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
             } else {
               recordsPerBucket.add(totalUnassignedInserts - (insertBuckets - 1) * insertRecordsPerBucket);
             }
-            // To do add Kafka Partition here
-            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, ((HoodieJavaEngineContext) context).getKafkaPartition() + "-" + FSUtils.createNewFileIdPfx(), partitionPath);
+
+            String newFilePrefixId = (String) config.getProps().get(NEW_FILE_ID_PREFIX_KEY);
+            String newFilePrefixHash = FSUtils.createNewFileIdPfx();
+            if (!StringUtils.isNullOrEmpty(newFilePrefixId)) {
+              MessageDigest md;
+              try {
+                md = MessageDigest.getInstance("MD5");
+              } catch (NoSuchAlgorithmException e) {
+                throw new HoodieException(e);
+              }
+              byte[] digest = Objects.requireNonNull(md).digest(newFilePrefixId.getBytes(StandardCharsets.UTF_8));
+              newFilePrefixHash = DatatypeConverter.printHexBinary(digest).toUpperCase();
+            }
+            
+            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, newFilePrefixHash, partitionPath);
             bucketInfoMap.put(totalBuckets, bucketInfo);
             totalBuckets++;
           }
@@ -285,6 +308,10 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
       // return first one, by default
       return targetBuckets.get(0).getKey().bucketNumber;
     }
+  }
+
+  public interface FileIndexId {
+    public String createFilePrefix();
   }
 
   /**
