@@ -22,6 +22,7 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
+import org.apache.hudi.connect.writers.HudiConnectConfigs;
 import org.apache.hudi.connect.writers.HudiConnectStreamer;
 import org.apache.hudi.connect.writers.LocalCommitFile;
 
@@ -29,6 +30,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +54,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   private static final int COMMIT_INTERVAL_MINS = 1;
   private static final int WRITE_STATUS_TIMEOUT_SECS = 60;
 
-  private final String taskId;
+  private final HudiConnectConfigs configs;
   private final TopicPartition partition;
   private final ScheduledExecutorService scheduler;
   private final HudiKafkaControlAgent kafkaControlClient;
@@ -67,8 +69,8 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   private Map<Integer, Long> currentConsumedKafkaOffsets;
   private State currentState;
 
-  public HudiTransactionCoordinator(String taskId, TopicPartition partition, int numPartitions, HudiKafkaControlAgent kafkaControlClient) {
-    this.taskId = taskId;
+  public HudiTransactionCoordinator(HudiConnectConfigs configs, TopicPartition partition, int numPartitions, HudiKafkaControlAgent kafkaControlClient) throws IOException {
+    this.configs = configs;
     this.partition = partition;
     this.numPartitions = numPartitions;
     this.kafkaControlClient = kafkaControlClient;
@@ -80,7 +82,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     this.globalCommittedKafkaOffsets = new HashMap<>();
     this.currentConsumedKafkaOffsets = new HashMap<>();
     this.currentState = State.INIT;
-    this.hudiConnectStreamer = new HudiConnectStreamer(-1, true);
+    this.hudiConnectStreamer = new HudiConnectStreamer(configs,-1, true);
   }
 
   @Override

@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 public class SimpleFileWriter implements RecordWriter {
@@ -41,33 +42,23 @@ public class SimpleFileWriter implements RecordWriter {
 
   private final FileOutputStream fos;
   private final TopicPartition partition;
-  private HudiConnectStreamer cowWriter;
 
   public SimpleFileWriter(TopicPartition partition, String commitTime) throws FileNotFoundException {
     File file = new File(BASE_PATH,
         String.format("%s-%s.%s", partition, commitTime, FILE_EXTENSION));
     fos = new FileOutputStream(file.getPath(), true);
     this.partition = partition;
-    cowWriter = new HudiConnectStreamer(partition.partition(),false);
   }
 
   @Override
   public void write(SinkRecord record, String commitTime) throws IOException {
     fos.write(new ObjectMapper().writeValueAsBytes(record.value()));
     fos.write(NEWLINE_ASCII);
-
-    if (cowWriter != null) {
-      try {
-        cowWriter.write(record, commitTime);
-      } catch (Exception exception) {
-        LOG.error("WNI HUDI OMG ERROR WRITING RECORD", exception);
-      }
-    }
   }
 
   @Override
   public List<WriteStatus> getWriteStatuses() {
-    return cowWriter.getWriteStatuses();
+    return Collections.EMPTY_LIST;
   }
 
   public TopicPartition topicPartition() {

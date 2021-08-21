@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,11 +50,11 @@ public class HudiSinkTask extends SinkTask {
   public static final String TASK_ID_CONFIG_NAME = "task.id";
   // ToDo fetch dynamically
   private static final int NUM_PARTITIONS = 4;
-  private static final String CONTROL_TOPIC_NAME = "hudi-control-topic";
 
-  private HudiKafkaControlAgent controlKafkaClient;
   private final Map<TopicPartition, HudiTransactionParticipant> hudiTransactionParticipants;
   private HudiTransactionCoordinator hudiTransactionCoordinator;
+  private HudiKafkaControlAgent controlKafkaClient;
+  private HudiConnectConfigs connectConfigs;
 
   private String taskId;
   private String connectorName;
@@ -71,16 +72,11 @@ public class HudiSinkTask extends SinkTask {
   public void start(Map<String, String> props) {
     connectorName = props.get("name");
     taskId = props.get(TASK_ID_CONFIG_NAME);
+    System.out.println(props);
     LOG.info("Starting Hudi Sink Task for {} connector {} with id {} with assignments {}", props, connectorName, taskId, context.assignment());
     try {
-      HudiConnectConfigs connectorConfig = HudiConnectConfigs.newBuilder().withProperties(props).build();
-      System.out.println("WNI CONFIGS " + connectorConfig.getControlTopicName() + " "
-      + connectorConfig.getSchemaProviderClass()
-          + connectorConfig.getProps().get("hoodie.deltastreamer.schemaprovider.source.schema.file")
-      + " " + connectorConfig.getHoodieWriteConfig().getBasePath()
-      + " " + connectorConfig.getHoodieWriteConfig().getTableName());
-
-      controlKafkaClient = HudiKafkaControlAgent.createKafkaControlManager("localhost:9092", CONTROL_TOPIC_NAME);
+      connectConfigs = HudiConnectConfigs.newBuilder().withProperties(props).build();
+      controlKafkaClient = HudiKafkaControlAgent.createKafkaControlManager("localhost:9092", connectConfigs.getControlTopicName());
       bootstrap(context.assignment());
     } catch (ConfigException e) {
       throw new ConnectException("Couldn't start HdfsSinkConnector due to configuration error.", e);
@@ -171,20 +167,23 @@ public class HudiSinkTask extends SinkTask {
   private void bootstrap(Collection<TopicPartition> partitions) {
     LOG.info("Bootstrap task for connector {} with id {} with assignments {} part {}",
         connectorName, taskId, context.assignment(), partitions);
-
-    for (TopicPartition partition : partitions) {
-      try {
-        // If the partition is 0, instantiate the Leader
-        if (partition.partition() == 0) {
-          hudiTransactionCoordinator = new HudiTransactionCoordinator(taskId, partition, NUM_PARTITIONS, controlKafkaClient);
-          hudiTransactionCoordinator.start();
+    try {
+      for (TopicPartition partition : partitions) {
+        try {
+          // If the partition is 0, instantiate the Leader
+          if (partition.partition() == 0) {
+            hudiTransactionCoordinator = new HudiTransactionCoordinator(connectConfigs, partition, NUM_PARTITIONS, controlKafkaClient);
+            hudiTransactionCoordinator.start();
+          }
+          HudiTransactionParticipant worker = new HudiTransactionParticipant(connectConfigs, partition, controlKafkaClient, context);
+          hudiTransactionParticipants.put(partition, worker);
+          worker.start();
+        } catch (FileNotFoundException exception) {
+          LOG.error("File not found for partition {} with taskId {}", partition.partition(), taskId);
         }
-        HudiTransactionParticipant worker = new HudiTransactionParticipant(taskId, partition, controlKafkaClient, context);
-        hudiTransactionParticipants.put(partition, worker);
-        worker.start();
-      } catch (FileNotFoundException exception) {
-        LOG.error("File not found for partition {} with taskId {}", partition.partition(), taskId);
       }
+    } catch (IOException exception) {
+      LOG.error("Fatal error bootstrapping the Task", exception);
     }
   }
 

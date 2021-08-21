@@ -5,7 +5,7 @@ import org.apache.hudi.common.config.ConfigGroups;
 import org.apache.hudi.common.config.ConfigProperty;
 import org.apache.hudi.common.config.HoodieConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.utilities.schema.FilebasedSchemaProvider;
+import org.apache.hudi.schema.FilebasedSchemaProvider;
 
 import javax.annotation.concurrent.Immutable;
 
@@ -16,20 +16,19 @@ import java.util.Properties;
  * Class storing configs for the HoodieWriteClient.
  */
 @Immutable
-@ConfigClassProperty(name = "Kafk Sink Connect Configurations",
+@ConfigClassProperty(name = "Kafka Sink Connect Configurations",
     groupName = ConfigGroups.Names.KAFKA_CONNECT,
     description = "Configurations for Kakfa Connect Sink Connector for Hudi.")
 public class HudiConnectConfigs extends HoodieConfig {
 
+  private static final String KAFKA_VALUE_CONVERTER = "value.converter";
+
   public static final ConfigProperty<String> SCHEMA_PROVIDER_CLASS = ConfigProperty
       .key("hoodie.schemaprovider.schema.class")
       .defaultValue(FilebasedSchemaProvider.class.getName())
-      .withDocumentation("subclass of org.apache.hudi.utilities.schema"
-          + ".SchemaProvider to attach schemas to input & target table data, built in options: "
-          + "org.apache.hudi.utilities.schema.FilebasedSchemaProvider."
-          + "Source (See org.apache.hudi.utilities.sources.Source) implementation can implement their own SchemaProvider."
-          + " For Sources that return Dataset<Row>, the schema is obtained implicitly. "
-          + "However, this CLI option allows overriding the schemaprovider returned by Source.");
+      .withDocumentation("subclass of org.apache.hudi.schema.SchemaProvider "
+          + "to attach schemas to input & target table data, built in options: "
+          + "org.apache.hudi.schema.FilebasedSchemaProvider.");
 
   public static final ConfigProperty<String> CONTROL_TOPIC_NAME = ConfigProperty
       .key("hoodie.kafka.control.topic")
@@ -66,6 +65,10 @@ public class HudiConnectConfigs extends HoodieConfig {
     return getString(CONTROL_TOPIC_NAME);
   }
 
+  public String getKafkaValueConverter() {
+    return getString(KAFKA_VALUE_CONVERTER);
+  }
+
   public static class Builder {
 
     protected final HudiConnectConfigs connectConfigs = new HudiConnectConfigs();
@@ -78,11 +81,12 @@ public class HudiConnectConfigs extends HoodieConfig {
 
     public Builder withWriteConfig(HoodieWriteConfig writeConfig) {
       connectConfigs.getProps().putAll(writeConfig.getProps());
+      isWriteConfigSet = true;
       return this;
     }
 
-    // Kafka connect task are passed with props with type Map<String, String>
-    public Builder withProperties(Map<String, String> properties) {
+    // Kafka connect task are passed with props with type Map<>
+    public Builder withProperties(Map<?, ?> properties) {
       connectConfigs.getProps().putAll(properties);
       return this;
     }
