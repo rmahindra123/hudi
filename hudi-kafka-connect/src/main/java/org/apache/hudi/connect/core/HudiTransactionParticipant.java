@@ -19,6 +19,8 @@
 package org.apache.hudi.connect.core;
 
 import org.apache.hudi.common.util.SerializationUtils;
+import org.apache.hudi.connect.writers.HudiConnectConfigs;
+import org.apache.hudi.connect.writers.HudiConnectStreamer;
 import org.apache.hudi.connect.writers.SimpleFileWriter;
 import org.apache.hudi.connect.kafka.KafkaControlAgent;
 import org.apache.hudi.connect.writers.TransactionWriteStatus;
@@ -45,7 +47,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiTransactionParticipant.class);
 
-  private final String taskId;
+  private final HudiConnectConfigs configs;
   private final LinkedList<SinkRecord> buffer;
   private final BlockingQueue<ControlEvent> controlEvents;
   private final TopicPartition partition;
@@ -55,8 +57,8 @@ public class HudiTransactionParticipant implements TransactionParticipant {
   private TransactionInfo ongoingTransactionInfo;
   private long committedKafkaOffset;
 
-  public HudiTransactionParticipant(String taskId, TopicPartition partition, KafkaControlAgent kafkaControlAgent, SinkTaskContext context) throws FileNotFoundException {
-    this.taskId = taskId;
+  public HudiTransactionParticipant(HudiConnectConfigs configs, TopicPartition partition, KafkaControlAgent kafkaControlAgent, SinkTaskContext context) throws FileNotFoundException {
+    this.configs = configs;
     this.buffer = new LinkedList<>();
     this.controlEvents = new LinkedBlockingQueue<>();
     this.partition = partition;
@@ -134,7 +136,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     context.resume(partition);
     String currentCommitTime = message.getCommitTime();
     try {
-      SimpleFileWriter writer = new SimpleFileWriter(partition, currentCommitTime);
+      HudiConnectStreamer writer = new HudiConnectStreamer(configs, partition.partition(), false);
       ongoingTransactionInfo = new TransactionInfo(currentCommitTime, new TransactionWriteStatus(currentCommitTime), writer);
       ongoingTransactionInfo.setLastWrittenKafkaOffset(committedKafkaOffset);
     } catch (Exception exception) {
