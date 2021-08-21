@@ -37,6 +37,7 @@ import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.schema.SchemaProvider;
+import org.apache.hudi.table.action.commit.JavaUpsertPartitioner;
 import org.apache.hudi.utilities.sources.helpers.AvroConvertor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -55,6 +56,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
 import java.util.UUID;
 
 public class HudiConnectStreamer implements RecordWriter {
@@ -74,57 +77,50 @@ public class HudiConnectStreamer implements RecordWriter {
     this.connectConfigs = connectConfigs;
     Configuration hadoopConf = new Configuration();
     hadoopConf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
-    String tablePath = connectConfigs.getHoodieWriteConfig().getBasePath();
 
-    if (initTable) {
-      try {
+    try {
+      this.schemaProvider = StringUtils.isNullOrEmpty(connectConfigs.getSchemaProviderClass()) ? null
+          : (SchemaProvider) ReflectionUtils.loadClass(connectConfigs.getSchemaProviderClass(),
+          new TypedProperties(connectConfigs.getProps()));
+
+      // Create the write client to write some records in
+      Properties props = new Properties();
+      HoodieWriteConfig writeConfig = HoodieWriteConfig.newBuilder()
+          .withProperties(connectConfigs.getProps())
+          .withProps(Collections.singletonMap(JavaUpsertPartitioner.NEW_FILE_ID_PREFIX_KEY, String.valueOf(partition)))
+          .withSchema(schemaProvider.getSourceSchema().toString())
+          .withParallelism(2, 2).withDeleteParallelism(2)
+          .withAutoCommit(false)
+          .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(HoodieIndex.IndexType.INMEMORY).build())
+          .withCompactionConfig(HoodieCompactionConfig.newBuilder().archiveCommitsWith(20, 30).build()).build();
+
+      if (initTable) {
+        String tablePath = writeConfig.getBasePath();
         // initialize the table, if not done already
         Path path = new Path(tablePath);
         FileSystem fs = FSUtils.getFs(tablePath, hadoopConf);
         if (!fs.exists(path)) {
           HoodieTableMetaClient.withPropertyBuilder()
               .setTableType(HoodieTableType.COPY_ON_WRITE.name())
-              .setTableName(connectConfigs.getHoodieWriteConfig().getTableName())
+              .setTableName(writeConfig.getTableName())
               .setPayloadClassName(HoodieAvroPayload.class.getName())
               .initTable(hadoopConf, tablePath);
         }
-      } catch (Exception exception) {
-        LOG.error("Fatal error initializing Table", exception);
       }
-    }
 
-    try {
-      this.schemaProvider = StringUtils.isNullOrEmpty(connectConfigs.getSchemaProviderClass()) ? null
-          : (SchemaProvider) ReflectionUtils.loadClass(connectConfigs.getSchemaProviderClass(),
-          new TypedProperties(connectConfigs.getProps()));
-    } catch (Throwable e) {
-      throw new IOException("Could not load schema provider class " + connectConfigs.getSchemaProviderClass(), e);
-    }
-
-    try {
-      // Create the write client to write some records in
-      HoodieWriteConfig cfg = HoodieWriteConfig.newBuilder().withPath(tablePath)
-          .withSchema(schemaProvider.getSourceSchema().toString())
-          .withParallelism(2, 2).withDeleteParallelism(2)
-          .withAutoCommit(false)
-          .forTable(connectConfigs.getHoodieWriteConfig().getTableName())
-          .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(HoodieIndex.IndexType.INMEMORY).build())
-          .withCompactionConfig(HoodieCompactionConfig.newBuilder().archiveCommitsWith(20, 30).build()).build();
-      HoodieJavaEngineContext context = new HoodieJavaEngineContext(hadoopConf);
-      context.setKafkaPartition(String.valueOf(partition));
       hoodieJavaWriteClient =
-          new HoodieJavaWriteClient<>(context, cfg);
-    } catch (Exception exc) {
-      LOG.error("WNI WNI OMG ", exc);
+          new HoodieJavaWriteClient<>(new HoodieJavaEngineContext(hadoopConf), writeConfig);
+
+      this.writeStatuses = new ArrayList<>();
+
+      JsonConverter jsonConverter = new JsonConverter();
+      Map<String, Object> converterConfig = new HashMap<>();
+      converterConfig.put("schemas.enable", "false");
+      jsonConverter.configure(converterConfig, false);
+      mapper = new ObjectMapper();
+    } catch (Throwable e) {
+      throw new IOException("Could not instantiate HudiConnectStreamer " + connectConfigs.getSchemaProviderClass(), e);
     }
-
-    this.writeStatuses = new ArrayList<>();
-
-    JsonConverter jsonConverter = new JsonConverter();
-    Map<String, Object> converterConfig = new HashMap<>();
-    converterConfig.put("schemas.enable", "false");
-    jsonConverter.configure(converterConfig, false);
-    mapper = new ObjectMapper();
   }
 
   public String startCommit() {
@@ -157,7 +153,28 @@ public class HudiConnectStreamer implements RecordWriter {
         throw new IOException("Unsupported Kafka Format type (" + connectConfigs.getKafkaValueConverter() + ")");
     }
 
-    String partitionPath = record.topic();
+    Random rand = new Random();
+    int random = rand.nextInt(5);
+    String partitionPath = "2020/01/01";
+    switch (random) {
+      case 1:
+        partitionPath = "2020/01/01";
+        break;
+      case 2:
+        partitionPath = "2020/02/01";
+        break;
+      case 3:
+        partitionPath = "2020/03/01";
+        break;
+      case 4:
+        partitionPath = "2020/04/01";
+        break;
+      case 5:
+      default:
+        partitionPath = "2020/05/01";
+        break;
+    }
+
     HoodieKey key = new HoodieKey(UUID.randomUUID().toString(), partitionPath);
     HoodieRecord hudiRecord = new HoodieRecord(key, new HoodieAvroPayload(avroRecord));
     List<WriteStatus> hudiWriteStatus = hoodieJavaWriteClient.insertPreppedRecords(Collections.singletonList(hudiRecord), commitTime);

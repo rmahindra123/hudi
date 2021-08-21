@@ -4,7 +4,6 @@ import org.apache.hudi.common.config.ConfigClassProperty;
 import org.apache.hudi.common.config.ConfigGroups;
 import org.apache.hudi.common.config.ConfigProperty;
 import org.apache.hudi.common.config.HoodieConfig;
-import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.schema.FilebasedSchemaProvider;
 
 import javax.annotation.concurrent.Immutable;
@@ -36,8 +35,6 @@ public class HudiConnectConfigs extends HoodieConfig {
       .withDocumentation("Kafka topic name used by the Hudi Sink Connector for "
           + "sending and receiving control messages. Not used for data records.");
 
-  private HoodieWriteConfig hoodieWriteConfig;
-
   protected HudiConnectConfigs() {
     super();
   }
@@ -46,15 +43,10 @@ public class HudiConnectConfigs extends HoodieConfig {
     super(props);
     Properties newProps = new Properties();
     newProps.putAll(props);
-    this.hoodieWriteConfig = HoodieWriteConfig.newBuilder().withProperties(newProps).build();
   }
 
   public static HudiConnectConfigs.Builder newBuilder() {
     return new HudiConnectConfigs.Builder();
-  }
-
-  public HoodieWriteConfig getHoodieWriteConfig() {
-    return hoodieWriteConfig;
   }
 
   public String getSchemaProviderClass() {
@@ -72,16 +64,9 @@ public class HudiConnectConfigs extends HoodieConfig {
   public static class Builder {
 
     protected final HudiConnectConfigs connectConfigs = new HudiConnectConfigs();
-    private boolean isWriteConfigSet = false;
 
     public Builder withControlTopicName(String controlTopicName) {
       connectConfigs.setValue(CONTROL_TOPIC_NAME, controlTopicName);
-      return this;
-    }
-
-    public Builder withWriteConfig(HoodieWriteConfig writeConfig) {
-      connectConfigs.getProps().putAll(writeConfig.getProps());
-      isWriteConfigSet = true;
       return this;
     }
 
@@ -99,10 +84,6 @@ public class HudiConnectConfigs extends HoodieConfig {
     protected void setDefaults() {
       // Check for mandatory properties
       connectConfigs.setDefaults(HudiConnectConfigs.class.getName());
-      // Make sure the props is propagated
-      connectConfigs.setDefaultOnCondition(
-          !isWriteConfigSet, HoodieWriteConfig.newBuilder().withProperties(
-              connectConfigs.getProps()).build());
     }
 
     public HudiConnectConfigs build() {
