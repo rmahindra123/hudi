@@ -18,13 +18,13 @@
 
 package org.apache.hudi.connect.writers;
 
+import org.apache.hudi.HoodieWriterUtils;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.client.common.HoodieJavaEngineContext;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieAvroPayload;
-import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
@@ -35,9 +35,12 @@ import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.config.HoodieCompactionConfig;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.fileid.KafkaConnectFileIdPrefixProvider;
+import org.apache.hudi.fileid.RandomFileIdPrefixProvider;
 import org.apache.hudi.index.HoodieIndex;
+import org.apache.hudi.keygen.KeyGenerator;
+import org.apache.hudi.keygen.factory.HoodieAvroKeyGeneratorFactory;
 import org.apache.hudi.schema.SchemaProvider;
-import org.apache.hudi.table.action.commit.JavaUpsertPartitioner;
 import org.apache.hudi.utilities.sources.helpers.AvroConvertor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,7 +48,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.kafka.connect.json.JsonConverter;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,18 +56,18 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Properties;
 import java.util.Random;
-import java.util.UUID;
 
 public class HudiConnectStreamer implements RecordWriter {
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiConnectStreamer.class);
 
   private final HudiConnectConfigs connectConfigs;
+  /**
+   * Extract the key for the target table.
+   */
+  private final KeyGenerator keyGenerator;
   private final SchemaProvider schemaProvider;
   private final List<WriteStatus> writeStatuses;
   private final ObjectMapper mapper;
@@ -72,7 +75,7 @@ public class HudiConnectStreamer implements RecordWriter {
 
   public HudiConnectStreamer(
       HudiConnectConfigs connectConfigs,
-      int partition,
+      TopicPartition partition,
       boolean initTable) throws IOException {
     this.connectConfigs = connectConfigs;
     Configuration hadoopConf = new Configuration();
@@ -83,11 +86,17 @@ public class HudiConnectStreamer implements RecordWriter {
           : (SchemaProvider) ReflectionUtils.loadClass(connectConfigs.getSchemaProviderClass(),
           new TypedProperties(connectConfigs.getProps()));
 
+      this.keyGenerator = HoodieAvroKeyGeneratorFactory.createKeyGenerator(
+          new TypedProperties(connectConfigs.getProps()));
+
       // Create the write client to write some records in
-      Properties props = new Properties();
       HoodieWriteConfig writeConfig = HoodieWriteConfig.newBuilder()
           .withProperties(connectConfigs.getProps())
-          .withProps(Collections.singletonMap(JavaUpsertPartitioner.NEW_FILE_ID_PREFIX_KEY, String.valueOf(partition)))
+          //.withFileIdPrefixProviderClassName(KafkaConnectFileIdPrefixProvider.class.getName())
+          .withFileIdPrefixProviderClassName(RandomFileIdPrefixProvider.class.getName())
+          .withProps(Collections.singletonMap(
+              KafkaConnectFileIdPrefixProvider.KAFKA_CONNECT_PARTITION_ID,
+              String.valueOf(partition.partition())))
           .withSchema(schemaProvider.getSourceSchema().toString())
           .withParallelism(2, 2).withDeleteParallelism(2)
           .withAutoCommit(false)
@@ -99,24 +108,25 @@ public class HudiConnectStreamer implements RecordWriter {
         // initialize the table, if not done already
         Path path = new Path(tablePath);
         FileSystem fs = FSUtils.getFs(tablePath, hadoopConf);
+
+        String partitionColumns = HoodieWriterUtils.getPartitionColumns(keyGenerator);
         if (!fs.exists(path)) {
           HoodieTableMetaClient.withPropertyBuilder()
               .setTableType(HoodieTableType.COPY_ON_WRITE.name())
               .setTableName(writeConfig.getTableName())
               .setPayloadClassName(HoodieAvroPayload.class.getName())
+              //.setBaseFileFormat()
+              .setPartitionFields(partitionColumns)
+              //.setRecordKeyFields()
+              .setKeyGeneratorClassProp(writeConfig.getKeyGeneratorClass())
+              //.setPreCombineField()
               .initTable(hadoopConf, tablePath);
         }
       }
 
       hoodieJavaWriteClient =
           new HoodieJavaWriteClient<>(new HoodieJavaEngineContext(hadoopConf), writeConfig);
-
       this.writeStatuses = new ArrayList<>();
-
-      JsonConverter jsonConverter = new JsonConverter();
-      Map<String, Object> converterConfig = new HashMap<>();
-      converterConfig.put("schemas.enable", "false");
-      jsonConverter.configure(converterConfig, false);
       mapper = new ObjectMapper();
     } catch (Throwable e) {
       throw new IOException("Could not instantiate HudiConnectStreamer " + connectConfigs.getSchemaProviderClass(), e);
@@ -155,28 +165,27 @@ public class HudiConnectStreamer implements RecordWriter {
 
     Random rand = new Random();
     int random = rand.nextInt(5);
-    String partitionPath = "2020/01/01";
+    String partitionPath;
     switch (random) {
+      case 0:
+        partitionPath = "2020-01-01";
+        break;
       case 1:
-        partitionPath = "2020/01/01";
+        partitionPath = "2020-02-01";
         break;
       case 2:
-        partitionPath = "2020/02/01";
+        partitionPath = "2020-03-01";
         break;
       case 3:
-        partitionPath = "2020/03/01";
+        partitionPath = "2020-04-01";
         break;
       case 4:
-        partitionPath = "2020/04/01";
-        break;
-      case 5:
       default:
-        partitionPath = "2020/05/01";
+        partitionPath = "2020-05-01";
         break;
     }
 
-    HoodieKey key = new HoodieKey(UUID.randomUUID().toString(), partitionPath);
-    HoodieRecord hudiRecord = new HoodieRecord(key, new HoodieAvroPayload(avroRecord));
+    HoodieRecord hudiRecord = new HoodieRecord(keyGenerator.getKey(avroRecord.get()), new HoodieAvroPayload(avroRecord));
     List<WriteStatus> hudiWriteStatus = hoodieJavaWriteClient.insertPreppedRecords(Collections.singletonList(hudiRecord), commitTime);
     writeStatuses.addAll(hudiWriteStatus);
   }
