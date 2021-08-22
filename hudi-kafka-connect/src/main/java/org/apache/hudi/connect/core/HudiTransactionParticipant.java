@@ -21,7 +21,6 @@ package org.apache.hudi.connect.core;
 import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.connect.writers.HudiConnectConfigs;
 import org.apache.hudi.connect.writers.HudiConnectStreamer;
-import org.apache.hudi.connect.writers.SimpleFileWriter;
 import org.apache.hudi.connect.kafka.KafkaControlAgent;
 import org.apache.hudi.connect.writers.TransactionWriteStatus;
 
@@ -136,7 +135,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     context.resume(partition);
     String currentCommitTime = message.getCommitTime();
     try {
-      HudiConnectStreamer writer = new HudiConnectStreamer(configs, partition.partition(), false);
+      HudiConnectStreamer writer = new HudiConnectStreamer(configs, partition, false);
       ongoingTransactionInfo = new TransactionInfo(currentCommitTime, new TransactionWriteStatus(currentCommitTime), writer);
       ongoingTransactionInfo.setLastWrittenKafkaOffset(committedKafkaOffset);
     } catch (Exception exception) {

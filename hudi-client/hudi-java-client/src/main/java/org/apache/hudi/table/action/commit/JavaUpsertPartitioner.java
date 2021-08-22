@@ -18,7 +18,7 @@
 
 package org.apache.hudi.table.action.commit;
 
-import org.apache.hudi.client.common.HoodieJavaEngineContext;
+import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieBaseFile;
@@ -30,11 +30,13 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.NumericUtils;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.common.util.collection.ImmutablePair;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.fileid.FileIdPrefixProvider;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.WorkloadProfile;
 import org.apache.hudi.table.WorkloadStat;
@@ -48,7 +50,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -64,7 +65,6 @@ import java.util.stream.Collectors;
 public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements Partitioner {
 
   private static final Logger LOG = LogManager.getLogger(JavaUpsertPartitioner.class);
-  public static final String NEW_FILE_ID_PREFIX_KEY = "hoodie.new.fileid.prefix";
 
   /**
    * List of all small files to be corrected.
@@ -183,7 +183,7 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
           }
 
           int insertBuckets = (int) Math.ceil((1.0 * totalUnassignedInserts) / insertRecordsPerBucket);
-          LOG.info("ç small file assignment: unassignedInserts => " + totalUnassignedInserts
+          LOG.info("After small file assignment: unassignedInserts => " + totalUnassignedInserts
               + ", totalInsertBuckets => " + insertBuckets + ", recordsPerBucket => " + insertRecordsPerBucket);
           for (int b = 0; b < insertBuckets; b++) {
             bucketNumbers.add(totalBuckets);
@@ -193,20 +193,11 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
               recordsPerBucket.add(totalUnassignedInserts - (insertBuckets - 1) * insertRecordsPerBucket);
             }
 
-            String newFilePrefixId = (String) config.getProps().get(NEW_FILE_ID_PREFIX_KEY);
-            String newFilePrefixHash = FSUtils.createNewFileIdPfx();
-            if (!StringUtils.isNullOrEmpty(newFilePrefixId)) {
-              MessageDigest md;
-              try {
-                md = MessageDigest.getInstance("MD5");
-              } catch (NoSuchAlgorithmException e) {
-                throw new HoodieException(e);
-              }
-              byte[] digest = Objects.requireNonNull(md).digest(newFilePrefixId.getBytes(StandardCharsets.UTF_8));
-              newFilePrefixHash = DatatypeConverter.printHexBinary(digest).toUpperCase();
-            }
-            
-            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, newFilePrefixHash, partitionPath);
+            FileIdPrefixProvider fileIdPrefixProvider = (FileIdPrefixProvider) ReflectionUtils.loadClass(
+                config.getFileIdPrefixProviderClassName(),
+                config.getProps());
+
+            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, fileIdPrefixProvider.createFilePrefix(partitionPath), partitionPath);
             bucketInfoMap.put(totalBuckets, bucketInfo);
             totalBuckets++;
           }
@@ -308,10 +299,6 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
       // return first one, by default
       return targetBuckets.get(0).getKey().bucketNumber;
     }
-  }
-
-  public interface FileIndexId {
-    public String createFilePrefix();
   }
 
   /**

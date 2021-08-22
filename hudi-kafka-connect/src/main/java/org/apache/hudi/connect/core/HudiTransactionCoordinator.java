@@ -82,7 +82,7 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     this.globalCommittedKafkaOffsets = new HashMap<>();
     this.currentConsumedKafkaOffsets = new HashMap<>();
     this.currentState = State.INIT;
-    this.hudiConnectStreamer = new HudiConnectStreamer(configs,-1, true);
+    this.hudiConnectStreamer = new HudiConnectStreamer(configs,new TopicPartition("", -1), true);
   }
 
   @Override
