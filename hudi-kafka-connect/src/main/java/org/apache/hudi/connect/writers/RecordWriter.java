@@ -32,9 +32,6 @@ import java.util.List;
  */
 public interface RecordWriter {
 
-  void write(SinkRecord record, String currentCommitTime) throws IOException;
-
-  List<WriteStatus> getWriteStatuses();
-
-  void close() throws IOException;
+  void write(SinkRecord record) throws IOException;
+  List<WriteStatus> close() throws IOException;
 }

@@ -4,6 +4,7 @@ import org.apache.hudi.common.config.ConfigClassProperty;
 import org.apache.hudi.common.config.ConfigGroups;
 import org.apache.hudi.common.config.ConfigProperty;
 import org.apache.hudi.common.config.HoodieConfig;
+import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.schema.FilebasedSchemaProvider;
 
 import javax.annotation.concurrent.Immutable;
@@ -35,6 +36,16 @@ public class HudiConnectConfigs extends HoodieConfig {
       .withDocumentation("Kafka topic name used by the Hudi Sink Connector for "
           + "sending and receiving control messages. Not used for data records.");
 
+  public static final ConfigProperty<String> META_SYNC_ENABLE = ConfigProperty
+      .key("hoodie.meta.sync.enable")
+      .defaultValue("false")
+      .withDocumentation("Enable Meta Sync such as Hive");
+
+  public static final ConfigProperty<String> META_SYNC_CLASSES = ConfigProperty
+      .key("hoodie.meta.sync.classes")
+      .defaultValue(HiveSyncTool.class.getName())
+      .withDocumentation("Meta sync client tool, using comma to separate multi tools");
+
   protected HudiConnectConfigs() {
     super();
   }
@@ -59,6 +70,14 @@ public class HudiConnectConfigs extends HoodieConfig {
 
   public String getKafkaValueConverter() {
     return getString(KAFKA_VALUE_CONVERTER);
+  }
+
+  public Boolean isMetaSyncEnabled() {
+    return getBoolean(META_SYNC_ENABLE);
+  }
+
+  public String getMetaSyncClasses() {
+    return getString(META_SYNC_CLASSES);
   }
 
   public static class Builder {
