@@ -33,7 +33,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
-public class SimpleFileWriter implements RecordWriter {
+public class SimpleFileWriter {
 
   private static final Logger LOG = LoggerFactory.getLogger(SimpleFileWriter.class);
   public static final String BASE_PATH = "/tmp";
@@ -50,13 +50,11 @@ public class SimpleFileWriter implements RecordWriter {
     this.partition = partition;
   }
 
-  @Override
   public void write(SinkRecord record, String commitTime) throws IOException {
     fos.write(new ObjectMapper().writeValueAsBytes(record.value()));
     fos.write(NEWLINE_ASCII);
   }
 
-  @Override
   public List<WriteStatus> getWriteStatuses() {
     return Collections.EMPTY_LIST;
   }
@@ -65,7 +63,6 @@ public class SimpleFileWriter implements RecordWriter {
     return partition;
   }
 
-  @Override
   public void close() throws IOException  {
     fos.flush();
     fos.close();

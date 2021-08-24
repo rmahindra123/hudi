@@ -22,6 +22,7 @@ import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.connect.writers.HudiConnectConfigs;
 import org.apache.hudi.connect.writers.HudiConnectStreamer;
 import org.apache.hudi.connect.kafka.KafkaControlAgent;
+import org.apache.hudi.connect.writers.RecordWriter;
 import org.apache.hudi.connect.writers.TransactionWriteStatus;
 
 import org.apache.kafka.common.TopicPartition;
@@ -30,7 +31,6 @@ import org.apache.kafka.connect.sink.SinkTaskContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.concurrent.BlockingQueue;
@@ -52,11 +52,12 @@ public class HudiTransactionParticipant implements TransactionParticipant {
   private final TopicPartition partition;
   private final SinkTaskContext context;
   private final KafkaControlAgent kafkaControlAgent;
+  private final HudiConnectStreamer hudiConnectStreamer;
 
   private TransactionInfo ongoingTransactionInfo;
   private long committedKafkaOffset;
 
-  public HudiTransactionParticipant(HudiConnectConfigs configs, TopicPartition partition, KafkaControlAgent kafkaControlAgent, SinkTaskContext context) throws FileNotFoundException {
+  public HudiTransactionParticipant(HudiConnectConfigs configs, TopicPartition partition, KafkaControlAgent kafkaControlAgent, SinkTaskContext context) throws IOException {
     this.configs = configs;
     this.buffer = new LinkedList<>();
     this.controlEvents = new LinkedBlockingQueue<>();
@@ -65,6 +66,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     this.kafkaControlAgent = kafkaControlAgent;
     this.ongoingTransactionInfo = null;
     this.committedKafkaOffset = 0;
+    hudiConnectStreamer = new HudiConnectStreamer(configs, partition, false);
   }
 
   @Override
@@ -135,7 +137,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
     context.resume(partition);
     String currentCommitTime = message.getCommitTime();
     try {
-      HudiConnectStreamer writer = new HudiConnectStreamer(configs, partition, false);
+      RecordWriter writer = hudiConnectStreamer.newTransactionWriter(currentCommitTime);
       ongoingTransactionInfo = new TransactionInfo(currentCommitTime, new TransactionWriteStatus(currentCommitTime), writer);
       ongoingTransactionInfo.setLastWrittenKafkaOffset(committedKafkaOffset);
     } catch (Exception exception) {
@@ -165,7 +167,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
       byte[] writeStatuses = new byte[0];
       try {
         writeStatuses = SerializationUtils.serialize(
-            ongoingTransactionInfo.getWriter().getWriteStatuses());
+            ongoingTransactionInfo.getWriter().close());
       } catch (IOException exception) {
         LOG.error("WNI OMG OMG SERIALIZATION ERROR", exception);
       }
@@ -202,7 +204,7 @@ public class HudiTransactionParticipant implements TransactionParticipant {
           SinkRecord record = buffer.peek();
           if (record != null
               && record.kafkaOffset() >= ongoingTransactionInfo.getLastWrittenKafkaOffset()) {
-            ongoingTransactionInfo.getWriter().write(record, ongoingTransactionInfo.getCommitTime());
+            ongoingTransactionInfo.getWriter().write(record);
             ongoingTransactionInfo.setLastWrittenKafkaOffset(record.kafkaOffset() + 1);
           } else if (record != null && record.kafkaOffset() < committedKafkaOffset) {
             LOG.warn("Received a kafka record with offset {} prior to last committed offset {} for partition {}",
