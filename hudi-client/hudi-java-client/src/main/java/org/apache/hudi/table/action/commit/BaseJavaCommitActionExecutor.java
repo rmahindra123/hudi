@@ -110,7 +110,6 @@ public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload
     }
 
     final Partitioner partitioner = getPartitioner(profile);
-
     Map<Integer, List<HoodieRecord<T>>> partitionedRecords = partition(inputRecords, partitioner);
 
     List<WriteStatus> writeStatuses = new LinkedList<>();
@@ -148,9 +147,6 @@ public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload
   }
 
   private Map<Integer, List<HoodieRecord<T>>> partition(List<HoodieRecord<T>> dedupedRecords, Partitioner partitioner) {
-
-    HoodieKey tempKey = dedupedRecords.get(0).getKey();
-
     Map<Integer, List<Pair<Pair<HoodieKey, Option<HoodieRecordLocation>>, HoodieRecord<T>>>> partitionedMidRecords = dedupedRecords
         .stream()
         .map(record -> Pair.of(Pair.of(record.getKey(), Option.ofNullable(record.getCurrentLocation())), record))
@@ -235,7 +231,6 @@ public abstract class BaseJavaCommitActionExecutor<T extends HoodieRecordPayload
     JavaUpsertPartitioner javaUpsertPartitioner = (JavaUpsertPartitioner) partitioner;
     BucketInfo binfo = javaUpsertPartitioner.getBucketInfo(partition);
     BucketType btype = binfo.bucketType;
-
     try {
       if (btype.equals(BucketType.INSERT)) {
         return handleInsert(binfo.fileIdPrefix, recordItr);

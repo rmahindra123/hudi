@@ -3,8 +3,8 @@ package org.apache.hudi.connect.writers;
 import org.apache.hudi.client.HoodieJavaWriteClient;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.engine.HoodieEngineContext;
+import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
-import org.apache.hudi.common.model.HoodieRecordPayload;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
 import org.apache.hudi.common.util.HoodieRecordSizeEstimator;
 import org.apache.hudi.common.util.collection.ExternalSpillableMap;
@@ -12,29 +12,36 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
 import org.apache.hudi.io.IOUtils;
+import org.apache.hudi.keygen.KeyGenerator;
+import org.apache.hudi.schema.SchemaProvider;
 
 import org.apache.avro.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class HudiBufferedWriter<T extends HoodieRecordPayload> implements HudiWriter<T> {
+public class HudiConnectBufferedWriter extends AbstractHudiConnectWriter {
 
-  private static final Logger LOG = LoggerFactory.getLogger(HudiBufferedWriter.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HudiConnectBufferedWriter.class);
 
   private final HoodieEngineContext context;
   private final HoodieJavaWriteClient writeClient;
   private final String instantTime;
   private final HoodieWriteConfig config;
-  private ExternalSpillableMap<String, HoodieRecord<T>> bufferedRecords;
+  private ExternalSpillableMap<String, HoodieRecord<HoodieAvroPayload>> bufferedRecords;
 
-  public HudiBufferedWriter(HoodieEngineContext context,
-                            HoodieJavaWriteClient writeClient,
-                            String instantTime,
-                            HoodieWriteConfig config) {
+  public HudiConnectBufferedWriter(HoodieEngineContext context,
+                                   HoodieJavaWriteClient writeClient,
+                                   String instantTime,
+                                   HudiConnectConfigs connectConfigs,
+                                   HoodieWriteConfig config,
+                                   KeyGenerator keyGenerator,
+                                   SchemaProvider schemaProvider) {
+    super(connectConfigs, keyGenerator, schemaProvider);
     this.context = context;
     this.writeClient = writeClient;
     this.instantTime = instantTime;
@@ -44,7 +51,7 @@ public class HudiBufferedWriter<T extends HoodieRecordPayload> implements HudiWr
 
   private void init() {
     try {
-      // Load the new records in a map
+      // Load and batch all incoming records in a map
       long memoryForMerge = IOUtils.getMaxMemoryPerPartitionMerge(context.getTaskContextSupplier(), config);
       LOG.info("MaxMemoryPerPartitionMerge => " + memoryForMerge);
       this.bufferedRecords = new ExternalSpillableMap<>(memoryForMerge,
@@ -59,11 +66,7 @@ public class HudiBufferedWriter<T extends HoodieRecordPayload> implements HudiWr
   }
 
   @Override
-  public void start() {
-  }
-
-  @Override
-  public void writeRecord(HoodieRecord<T> record) {
+  public void writeHudiRecord(HoodieRecord<HoodieAvroPayload> record) {
     bufferedRecords.put(record.getRecordKey(), record);
     LOG.info("Number of entries in MemoryBasedMap => "
         + bufferedRecords.getInMemoryMapNumEntries()
@@ -74,14 +77,16 @@ public class HudiBufferedWriter<T extends HoodieRecordPayload> implements HudiWr
   }
 
   @Override
-  public List<WriteStatus> close() {
+  public List<WriteStatus> flushHudiRecords() {
     try {
-      // Write out all records
-      List<WriteStatus> writeStatuses = writeClient.insertPreppedRecords(
-          bufferedRecords.values().stream().collect(Collectors.toList()),
-          instantTime);
+      List<WriteStatus> writeStatuses = new ArrayList<>();
+      // Write out all records if non-empty
+      if (!bufferedRecords.isEmpty()) {
+        writeStatuses = writeClient.insertPreppedRecords(
+            bufferedRecords.values().stream().collect(Collectors.toList()),
+            instantTime);
+      }
       bufferedRecords.close();
-      //performMergeDataValidationCheck(writeStatuses);
       return writeStatuses;
     } catch (Exception e) {
       throw new HoodieException("Write records failed", e);

@@ -48,6 +48,7 @@ public class HudiSinkConnector extends SinkConnector {
   @Override
   public void start(Map<String, String> props) {
     configProps = new HashMap<>(props);
+    System.out.println("WNI CONN CONFIGS " + props);
   }
 
   @Override
