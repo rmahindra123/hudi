@@ -18,21 +18,19 @@
 
 package org.apache.hudi.connect.core;
 
-import org.apache.hudi.connect.writers.RecordWriter;
-import org.apache.hudi.connect.writers.TransactionWriteStatus;
+import org.apache.hudi.connect.writers.AbstractHudiConnectWriter;
+import org.apache.hudi.connect.writers.HudiConnectWriterProvider;
 
 public class TransactionInfo {
 
   private final String commitTime;
-  private final TransactionWriteStatus transactionWriteStatus;
-  private final RecordWriter writer;
+  private final AbstractHudiConnectWriter writer;
   private long lastWrittenKafkaOffset;
   private boolean commitInitiated;
 
-  public TransactionInfo(String commitTime, TransactionWriteStatus transactionWriteStatus, RecordWriter writer) {
+  public TransactionInfo(String commitTime, HudiConnectWriterProvider writerProvider) {
     this.commitTime = commitTime;
-    this.transactionWriteStatus = transactionWriteStatus;
-    this.writer = writer;
+    this.writer = writerProvider.getWriter(commitTime);
     this.lastWrittenKafkaOffset = 0;
     this.commitInitiated = false;
   }
@@ -41,11 +39,7 @@ public class TransactionInfo {
     return commitTime;
   }
 
-  public TransactionWriteStatus getWriteStatus() {
-    return transactionWriteStatus;
-  }
-
-  public RecordWriter getWriter() {
+  public AbstractHudiConnectWriter getWriter() {
     return writer;
   }
 

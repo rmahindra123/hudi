@@ -22,6 +22,7 @@ import org.apache.hudi.connect.core.HudiTransactionCoordinator;
 import org.apache.hudi.connect.core.HudiTransactionParticipant;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
 import org.apache.hudi.connect.writers.HudiConnectConfigs;
+import org.apache.hudi.exception.HoodieException;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -167,23 +168,19 @@ public class HudiSinkTask extends SinkTask {
   private void bootstrap(Collection<TopicPartition> partitions) {
     LOG.info("Bootstrap task for connector {} with id {} with assignments {} part {}",
         connectorName, taskId, context.assignment(), partitions);
-    try {
-      for (TopicPartition partition : partitions) {
-        try {
-          // If the partition is 0, instantiate the Leader
-          if (partition.partition() == 0) {
-            hudiTransactionCoordinator = new HudiTransactionCoordinator(connectConfigs, partition, NUM_PARTITIONS, controlKafkaClient);
-            hudiTransactionCoordinator.start();
-          }
-          HudiTransactionParticipant worker = new HudiTransactionParticipant(connectConfigs, partition, controlKafkaClient, context);
-          hudiTransactionParticipants.put(partition, worker);
-          worker.start();
-        } catch (FileNotFoundException exception) {
-          LOG.error("File not found for partition {} with taskId {}", partition.partition(), taskId);
+    for (TopicPartition partition : partitions) {
+      try {
+        // If the partition is 0, instantiate the Leader
+        if (partition.partition() == 0) {
+          hudiTransactionCoordinator = new HudiTransactionCoordinator(connectConfigs, partition, controlKafkaClient);
+          hudiTransactionCoordinator.start();
         }
+        HudiTransactionParticipant worker = new HudiTransactionParticipant(connectConfigs, partition, controlKafkaClient, context);
+        hudiTransactionParticipants.put(partition, worker);
+        worker.start();
+      } catch (HoodieException exception) {
+        LOG.error("Fatal error initializing task {} for partition {}", taskId, partition.partition(), exception);
       }
-    } catch (IOException exception) {
-      LOG.error("Fatal error bootstrapping the Task", exception);
     }
   }
 

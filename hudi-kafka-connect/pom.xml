@@ -98,13 +98,33 @@
             <version>0.2.6</version>
             <scope>compile</scope>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.apache.hadoop/hadoop-mapreduce-client-core -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-mapreduce-client-core</artifactId>
+            <version>0.23.1</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>org.apache.hive</groupId>
             <artifactId>hive-common</artifactId>
             <version>2.3.9</version>
             <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-collections</groupId>
+                    <artifactId>commons-collections</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-httpclient</groupId>
+                    <artifactId>commons-httpclient</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
-
         <dependency>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
@@ -201,12 +221,19 @@
                                 <excludes>
                                     <exclude>org.apache.zookeeper:zookeeper</exclude>
                                     <exclude>com.fasterxml.jackson.core:jackson-annotations</exclude>
+                                    <exclude>commons-httpclient:commons-httpclient</exclude>
                                     <exclude>org.apache.htrace:htrace-core</exclude>
                                     <exclude>org.jamon:jamon-runtime</exclude>
                                     <exclude>jdk.tools:jdk.tools</exclude>
                                     <exclude>junit:junit</exclude>
                                 </excludes>
                             </artifactSet>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.avro.</pattern>
+                                    <shadedPattern>org.apache.hudi.org.apache.avro.</shadedPattern>
+                                </relocation>
+                            </relocations>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <filters>
                                 <filter>

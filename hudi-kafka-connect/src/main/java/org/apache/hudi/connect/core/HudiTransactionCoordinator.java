@@ -23,24 +23,31 @@ import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.StringUtils;
 import org.apache.hudi.connect.kafka.HudiKafkaControlAgent;
 import org.apache.hudi.connect.writers.HudiConnectConfigs;
-import org.apache.hudi.connect.writers.HudiConnectStreamer;
-import org.apache.hudi.connect.writers.LocalCommitFile;
+import org.apache.hudi.connect.writers.ConnectTransactionServicesProvider;
+import org.apache.hudi.exception.HoodieException;
 
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of the Coordinator that
@@ -50,6 +57,10 @@ import java.util.concurrent.TimeUnit;
 public class HudiTransactionCoordinator implements TransactionCoordinator, Runnable {
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiTransactionCoordinator.class);
+  private static final String BOOTSTRAP_SERVERS_CFG = "bootstrap.servers";
+  private static final String KAFKA_OFFSET_KEY = "kafka.commit.offsets";
+  private static final String KAFKA_OFFSET_DELIMITER = ",";
+  private static final String KAFKA_OFFSET_KV_DELIMITER = "=";
   private static final int START_COMMIT_INIT_DELAY_MS = 100;
   private static final int COMMIT_INTERVAL_MINS = 1;
   private static final int WRITE_STATUS_TIMEOUT_SECS = 60;
@@ -60,20 +71,30 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   private final HudiKafkaControlAgent kafkaControlClient;
   private final BlockingQueue<CoordinatorEvent> events;
   private final ExecutorService executorService;
-  private final HudiConnectStreamer hudiConnectStreamer;
+  private final ConnectTransactionServicesProvider hudiTransactionServices;
 
   private String currentCommitTime;
-  private int numPartitions;
   private Map<Integer, List<WriteStatus>> partitionsWriteStatusReceived;
   private Map<Integer, Long> globalCommittedKafkaOffsets;
   private Map<Integer, Long> currentConsumedKafkaOffsets;
   private State currentState;
+  private int numPartitions;
 
-  public HudiTransactionCoordinator(HudiConnectConfigs configs, TopicPartition partition, int numPartitions, HudiKafkaControlAgent kafkaControlClient) throws IOException {
+  public HudiTransactionCoordinator(HudiConnectConfigs configs,
+                                    TopicPartition partition,
+                                    HudiKafkaControlAgent kafkaControlClient) throws HoodieException {
+    this(configs, partition, kafkaControlClient, new ConnectTransactionServicesProvider((configs)));
+  }
+
+  public HudiTransactionCoordinator(HudiConnectConfigs configs,
+                                    TopicPartition partition,
+                                    HudiKafkaControlAgent kafkaControlClient,
+                                    ConnectTransactionServicesProvider hudiTransactionServices) {
     this.configs = configs;
     this.partition = partition;
-    this.numPartitions = numPartitions;
     this.kafkaControlClient = kafkaControlClient;
+    this.hudiTransactionServices = hudiTransactionServices;
+
     this.events = new LinkedBlockingQueue<>();
     this.executorService = Executors.newSingleThreadExecutor();
     this.scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -82,7 +103,6 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     this.globalCommittedKafkaOffsets = new HashMap<>();
     this.currentConsumedKafkaOffsets = new HashMap<>();
     this.currentState = State.INIT;
-    this.hudiConnectStreamer = new HudiConnectStreamer(configs,new TopicPartition("", -1), true);
   }
 
   @Override
@@ -183,8 +203,9 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
   }
 
   private void startNewCommit() {
+    numPartitions = getLatestNumPartitions(configs.getString(BOOTSTRAP_SERVERS_CFG), partition.topic());
     partitionsWriteStatusReceived.clear();
-    currentCommitTime = hudiConnectStreamer.startCommit();
+    currentCommitTime = hudiTransactionServices.startCommit();
     ControlEvent message = new ControlEvent.Builder(
         ControlEvent.MsgType.START_COMMIT,
         currentCommitTime,
@@ -231,11 +252,12 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
         && currentState.equals(State.ENDED_COMMIT)) {
       // Commit the kafka offsets to the commit file
       try {
-        commitFile(currentConsumedKafkaOffsets);
         List<WriteStatus> allWriteStatuses = new ArrayList<>();
         partitionsWriteStatusReceived.forEach((key, value) -> allWriteStatuses.addAll(value));
-        // Commit hudi
-        hudiConnectStreamer.endCommit(currentCommitTime, allWriteStatuses);
+        // Commit the last write in Hudi, along with the latest kafka offset
+        hudiTransactionServices.endCommit(currentCommitTime,
+            allWriteStatuses,
+            transformKafkaOffsets(currentConsumedKafkaOffsets));
 
         globalCommittedKafkaOffsets.putAll(currentConsumedKafkaOffsets);
         currentState = State.WRITE_STATUS_RCVD;
@@ -275,21 +297,30 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     }, 100, TimeUnit.MILLISECONDS);
   }
 
-  private void commitFile(Map<Integer, Long> committedKafkaOffsets) throws Exception {
-    LocalCommitFile commitFile = new LocalCommitFile(currentCommitTime,
-        numPartitions,
-        new ArrayList<>(),
-        partition.topic(),
-        committedKafkaOffsets);
-    commitFile.doCommit();
-  }
-
   private void initializeGlobalCommittedKafkaOffsets() {
     try {
-      LocalCommitFile latestCommitFile = LocalCommitFile.getLatestCommit();
-      globalCommittedKafkaOffsets = latestCommitFile.getKafkaOffsets();
+     Map<String, String> commitMetadata = hudiTransactionServices.loadLatestCommitMetadata();
+      String latestKafkaOffsets = commitMetadata.get(KAFKA_OFFSET_KEY);
+      if (!StringUtils.isNullOrEmpty(latestKafkaOffsets)) {
+        LOG.info("Retrieved Raw Kafka offsets from Hudi Commit File " + latestKafkaOffsets);
+        globalCommittedKafkaOffsets = Arrays.stream(latestKafkaOffsets.split(KAFKA_OFFSET_DELIMITER))
+            .map(entry -> entry.split(KAFKA_OFFSET_KV_DELIMITER))
+            .collect(Collectors.toMap(entry -> Integer.parseInt(entry[0]), entry -> Long.parseLong(entry[1])));
+        LOG.info("Initialized the kafka offset commits " + globalCommittedKafkaOffsets);
+      }
     } catch (Exception exception) {
-      LOG.error("Fatal error fetching latest commit file", exception);
+      throw new HoodieException("Could not deserialize the kafka commit offsets", exception);
+    }
+  }
+
+  private Map<String, String> transformKafkaOffsets(Map<Integer, Long> kafkaOffsets) {
+    try {
+      String kafkaOffsetValue = kafkaOffsets.keySet().stream()
+          .map(key -> key + KAFKA_OFFSET_KV_DELIMITER + kafkaOffsets.get(key))
+          .collect(Collectors.joining(KAFKA_OFFSET_DELIMITER));
+      return Collections.singletonMap(KAFKA_OFFSET_KEY, kafkaOffsetValue);
+    } catch (Exception exception) {
+      throw new HoodieException("Could not serialize the kafka commit offsets", exception);
     }
   }
 
@@ -300,5 +331,21 @@ public class HudiTransactionCoordinator implements TransactionCoordinator, Runna
     WRITE_STATUS_RCVD,
     WRITE_STATUS_TIMEDOUT,
     ACKED_COMMIT,
+  }
+
+  private static int getLatestNumPartitions(String bootstrapServers, String topicName) {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", bootstrapServers);
+    try {
+      AdminClient client = AdminClient.create(props);
+      DescribeTopicsResult result = client.describeTopics(Arrays.asList(topicName));
+      Map<String, KafkaFuture<TopicDescription>> values = result.values();
+      KafkaFuture<TopicDescription> topicDescription = values.get(topicName);
+      int numPartitions = topicDescription.get().partitions().size();
+      LOG.info("Latest number of partitions for topic {} is {}", topicName, numPartitions);
+      return numPartitions;
+    } catch (Exception exception) {
+      throw new HoodieException("Fatal error fetching the latest partition of kafka topic name" + topicName, exception);
+    }
   }
 }
