@@ -7,6 +7,7 @@ import org.apache.hudi.common.model.HoodieAvroPayload;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.util.DefaultSizeEstimator;
 import org.apache.hudi.common.util.HoodieRecordSizeEstimator;
+import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.ExternalSpillableMap;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
@@ -82,9 +83,12 @@ public class HudiConnectBufferedWriter extends AbstractHudiConnectWriter {
       List<WriteStatus> writeStatuses = new ArrayList<>();
       // Write out all records if non-empty
       if (!bufferedRecords.isEmpty()) {
-        writeStatuses = writeClient.insertPreppedRecords(
+        writeStatuses = writeClient.bulkInsertPreppedRecords(
             bufferedRecords.values().stream().collect(Collectors.toList()),
-            instantTime);
+            instantTime, Option.empty());
+        /*writeStatuses = writeClient.insertPreppedRecords(
+            bufferedRecords.values().stream().collect(Collectors.toList()),
+            instantTime);*/
       }
       bufferedRecords.close();
       return writeStatuses;

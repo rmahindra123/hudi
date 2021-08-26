@@ -82,8 +82,8 @@ public class HudiConnectWriterProvider {
       // Create the write client to write some records in
       writeConfig = HoodieWriteConfig.newBuilder()
           .withProperties(connectConfigs.getProps())
-          //.withFileIdPrefixProviderClassName(KafkaConnectFileIdPrefixProvider.class.getName())
-          .withFileIdPrefixProviderClassName(RandomFileIdPrefixProvider.class.getName())
+          .withFileIdPrefixProviderClassName(KafkaConnectFileIdPrefixProvider.class.getName())
+          //.withFileIdPrefixProviderClassName(RandomFileIdPrefixProvider.class.getName())
           .withProps(Collections.singletonMap(
               KafkaConnectFileIdPrefixProvider.KAFKA_CONNECT_PARTITION_ID,
               String.valueOf(partition)))

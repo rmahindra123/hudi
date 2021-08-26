@@ -136,8 +136,6 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
 
     for (String partitionPath : partitionPaths) {
       WorkloadStat pStat = profile.getWorkloadStat(partitionPath);
-      System.out.println("WNI JavaUpsertPartitioner assignInserts1 " + partitionPath
-          + " " + pStat.getNumInserts());
       if (pStat.getNumInserts() > 0) {
 
         List<SmallFile> smallFiles = partitionSmallFilesMap.get(partitionPath);
@@ -148,9 +146,6 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
         long totalUnassignedInserts = pStat.getNumInserts();
         List<Integer> bucketNumbers = new ArrayList<>();
         List<Long> recordsPerBucket = new ArrayList<>();
-
-        System.out.println("WNI JavaUpsertPartitioner assignInserts2 " + partitionPath
-            + " " + smallFiles.size());
 
         // first try packing this into one of the smallFiles
         /*for (SmallFile smallFile : smallFiles) {
@@ -193,10 +188,6 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
             FileIdPrefixProvider fileIdPrefixProvider = (FileIdPrefixProvider) ReflectionUtils.loadClass(
                 config.getFileIdPrefixProviderClassName(),
                 config.getProps());
-
-            LOG.error("WNI JAvaUpsertPartitioner " + config.getProps().get(KafkaConnectFileIdPrefixProvider.KAFKA_CONNECT_PARTITION_ID)
-                + " " + partitionPath
-                + " " + fileIdPrefixProvider.createFilePrefix(partitionPath));
 
             BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, fileIdPrefixProvider.createFilePrefix(partitionPath), partitionPath);
             bucketInfoMap.put(totalBuckets, bucketInfo);
