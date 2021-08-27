@@ -10,8 +10,6 @@ import org.apache.hudi.common.model.HoodieCommitMetadata;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
-import org.apache.hudi.common.table.timeline.HoodieInstant;
-import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.CommitUtils;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
@@ -65,14 +63,15 @@ public class ConnectTransactionServicesProvider extends HudiConnectWriterProvide
 
   public String startCommit() {
     String newCommitTime = hoodieJavaWriteClient.startCommit();
-    LOG.info("WNI Starting commit " + newCommitTime);
+    hoodieJavaWriteClient.preBulkWrite(newCommitTime);
+    LOG.info("Starting Hudi commit " + newCommitTime);
     return newCommitTime;
   }
 
   public void endCommit(String commitTime, List<WriteStatus> writeStatuses, Map<String, String> extraMetadata) {
-    LOG.info("WNI Ending commit " + commitTime);
     hoodieJavaWriteClient.commit(commitTime, writeStatuses, Option.of(extraMetadata),
         HoodieActiveTimeline.COMMIT_ACTION, Collections.emptyMap());
+    LOG.info("Ending Hudi commit " + commitTime);
     syncMeta();
   }
 

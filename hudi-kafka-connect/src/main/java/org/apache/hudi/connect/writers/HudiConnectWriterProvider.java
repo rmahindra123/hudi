@@ -83,12 +83,12 @@ public class HudiConnectWriterProvider {
       writeConfig = HoodieWriteConfig.newBuilder()
           .withProperties(connectConfigs.getProps())
           .withFileIdPrefixProviderClassName(KafkaConnectFileIdPrefixProvider.class.getName())
-          //.withFileIdPrefixProviderClassName(RandomFileIdPrefixProvider.class.getName())
           .withProps(Collections.singletonMap(
               KafkaConnectFileIdPrefixProvider.KAFKA_CONNECT_PARTITION_ID,
               String.valueOf(partition)))
           .withSchema(schemaProvider.getSourceSchema().toString())
           .withAutoCommit(false)
+          .withEnableInsertAvoidTransitionInflight()
           .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(HoodieIndex.IndexType.INMEMORY).build())
           .build();
 

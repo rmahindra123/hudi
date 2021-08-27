@@ -76,20 +76,10 @@ public class JavaBulkInsertHelper<T extends HoodieRecordPayload, R> extends Abst
     HoodieWriteMetadata result = new HoodieWriteMetadata();
 
     //transition bulk_insert state to inflight
-    try {
+    if (!config.getInsertAvoidTransitionInflight()) {
       table.getActiveTimeline().transitionRequestedToInflight(new HoodieInstant(HoodieInstant.State.REQUESTED,
               table.getMetaClient().getCommitActionType(), instantTime), Option.empty(),
           config.shouldAllowMultiWriteOnSameInstant());
-    } catch (Exception exception) {
-      HoodieTableMetaClient metaClient = table.getMetaClient();
-      HoodieInstant inflightInstant = new HoodieInstant(HoodieInstant.State.INFLIGHT, metaClient.getCommitActionType(), instantTime);
-      try {
-        if (!metaClient.getFs().exists(new Path(metaClient.getMetaPath(), inflightInstant.getFileName()))) {
-          throw new HoodieCommitException("Failed to commit " + instantTime + " unable to save inflight metadata ", exception);
-        }
-      } catch (IOException ioException) {
-        throw new HoodieCommitException("Failed to commit " + instantTime + " unable to save inflight metadata ", ioException);
-      }
     }
 
     // write new files

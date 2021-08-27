@@ -419,6 +419,12 @@ public class HoodieWriteConfig extends HoodieConfig {
       .defaultValue(RandomFileIdPrefixProvider.class.getName())
       .withDocumentation("File Id Prefix provider class, that implements `org.apache.hudi.fileid.FileIdPrefixProvider`");
 
+  public static final ConfigProperty<String> INSERT_AVOID_TRANSITION_INFLIGHT = ConfigProperty
+      .key("hoodie.insert.avoid.transition.inflight")
+      .defaultValue("false")
+      .withDocumentation("When inserting records for BULK insert, do not change timeline status to inflight.");
+
+
   private ConsistencyGuardConfig consistencyGuardConfig;
 
   // Hoodie Write Client transparently rewrites File System View config when embedded mode is enabled
@@ -1758,6 +1764,10 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getString(FILEID_PREFIX_PROVIDER_CLASS);
   }
 
+  public boolean getInsertAvoidTransitionInflight() {
+    return getBoolean(INSERT_AVOID_TRANSITION_INFLIGHT);
+  }
+
   public static class Builder {
 
     protected final HoodieWriteConfig writeConfig = new HoodieWriteConfig();
@@ -2091,6 +2101,11 @@ public class HoodieWriteConfig extends HoodieConfig {
 
     public Builder withFileIdPrefixProviderClassName(String fileIdPrefixProviderClassName) {
       writeConfig.setValue(FILEID_PREFIX_PROVIDER_CLASS, fileIdPrefixProviderClassName);
+      return this;
+    }
+
+    public Builder withEnableInsertAvoidTransitionInflight() {
+      writeConfig.setValue(INSERT_AVOID_TRANSITION_INFLIGHT, "true");
       return this;
     }
 
