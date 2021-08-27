@@ -24,7 +24,6 @@ import org.apache.hudi.common.testutils.HoodieTestDataGenerator;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.utilities.deltastreamer.SourceFormatAdapter;
 import org.apache.hudi.utilities.schema.FilebasedSchemaProvider;
-import org.apache.hudi.utilities.schema.SchemaProvider;
 import org.apache.hudi.utilities.sources.InputBatch;
 import org.apache.hudi.utilities.sources.Source;
 import org.apache.hudi.utilities.testutils.UtilitiesTestBase;
@@ -55,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public abstract class AbstractDFSSourceTestBase extends UtilitiesTestBase {
 
-  protected SchemaProvider schemaProvider;
+  protected FilebasedSchemaProvider schemaProvider;
   protected String dfsRoot;
   protected String fileSuffix;
   protected HoodieTestDataGenerator dataGenerator = new HoodieTestDataGenerator();
@@ -74,8 +73,7 @@ public abstract class AbstractDFSSourceTestBase extends UtilitiesTestBase {
   @BeforeEach
   public void setup() throws Exception {
     super.setup();
-    schemaProvider = new InputBatch.NullSchemaProvider();
-    SchemaProvider provider = new FilebasedSchemaProvider(Helpers.setupSchemaOnDFS(), jsc);
+    schemaProvider = new FilebasedSchemaProvider(Helpers.setupSchemaOnDFS(), jsc);
   }
 
   @AfterEach
@@ -133,25 +131,25 @@ public abstract class AbstractDFSSourceTestBase extends UtilitiesTestBase {
     assertEquals(Option.empty(),
         sourceFormatAdapter.fetchNewDataInAvroFormat(Option.empty(), sourceLimit).getBatch());
     // Test fetching Avro format
-    /*InputBatch<JavaRDD<GenericRecord>> fetch1 =
+    InputBatch<JavaRDD<GenericRecord>> fetch1 =
         sourceFormatAdapter.fetchNewDataInAvroFormat(Option.empty(), Long.MAX_VALUE);
-    assertEquals(100, fetch1.getBatch().get().count());*/
+    assertEquals(100, fetch1.getBatch().get().count());
     // Test fetching Row format
     InputBatch<Dataset<Row>> fetch1AsRows =
         sourceFormatAdapter.fetchNewDataInRowFormat(Option.empty(), Long.MAX_VALUE);
     assertEquals(100, fetch1AsRows.getBatch().get().count());
     // Test Avro to Row format
-    /*Dataset<Row> fetch1Rows = AvroConversionUtils
+    Dataset<Row> fetch1Rows = AvroConversionUtils
         .createDataFrame(JavaRDD.toRDD(fetch1.getBatch().get()),
             schemaProvider.getSourceSchema().toString(), sparkSession);
-    assertEquals(100, fetch1Rows.count());*/
+    assertEquals(100, fetch1Rows.count());
 
     // 2. Produce new data, extract new data
     generateOneFile("2", "001", 10000);
     // Test fetching Avro format
-    /*InputBatch<JavaRDD<GenericRecord>> fetch2 = sourceFormatAdapter.fetchNewDataInAvroFormat(
+    InputBatch<JavaRDD<GenericRecord>> fetch2 = sourceFormatAdapter.fetchNewDataInAvroFormat(
         Option.of(fetch1.getCheckpointForNextBatch()), Long.MAX_VALUE);
-    assertEquals(10000, fetch2.getBatch().get().count());*/
+    assertEquals(10000, fetch2.getBatch().get().count());
     // Test fetching Row format
     InputBatch<Dataset<Row>> fetch2AsRows = sourceFormatAdapter.fetchNewDataInRowFormat(
         Option.of(fetch1AsRows.getCheckpointForNextBatch()), Long.MAX_VALUE);
@@ -169,14 +167,14 @@ public abstract class AbstractDFSSourceTestBase extends UtilitiesTestBase {
     assertEquals(10000, rowDataset.count());
 
     // 4. Extract with latest checkpoint => no new data returned
-    /*InputBatch<JavaRDD<GenericRecord>> fetch4 = sourceFormatAdapter.fetchNewDataInAvroFormat(
+    InputBatch<JavaRDD<GenericRecord>> fetch4 = sourceFormatAdapter.fetchNewDataInAvroFormat(
         Option.of(fetch2.getCheckpointForNextBatch()), Long.MAX_VALUE);
-    assertEquals(Option.empty(), fetch4.getBatch());*/
+    assertEquals(Option.empty(), fetch4.getBatch());
 
     // 5. Extract from the beginning
-    /*InputBatch<JavaRDD<GenericRecord>> fetch5 = sourceFormatAdapter.fetchNewDataInAvroFormat(
+    InputBatch<JavaRDD<GenericRecord>> fetch5 = sourceFormatAdapter.fetchNewDataInAvroFormat(
         Option.empty(), Long.MAX_VALUE);
-    assertEquals(10100, fetch5.getBatch().get().count());*/
+    assertEquals(10100, fetch5.getBatch().get().count());
 
     // 6. Should skip files/directories whose names start with prefixes ("_", ".")
     generateOneFile(".checkpoint/3", "002", 100);
@@ -187,8 +185,8 @@ public abstract class AbstractDFSSourceTestBase extends UtilitiesTestBase {
     generateOneFile("foo/.bar/3", "002", 1); // not ok
     generateOneFile("foo/bar/3", "002", 1); // ok
     // fetch everything from the beginning
-    /*InputBatch<JavaRDD<GenericRecord>> fetch6 = sourceFormatAdapter.fetchNewDataInAvroFormat(
+    InputBatch<JavaRDD<GenericRecord>> fetch6 = sourceFormatAdapter.fetchNewDataInAvroFormat(
         Option.empty(), Long.MAX_VALUE);
-    assertEquals(10101, fetch6.getBatch().get().count());*/
+    assertEquals(10101, fetch6.getBatch().get().count());
   }
 }

@@ -84,13 +84,12 @@ public class HudiConnectBufferedWriter extends AbstractHudiConnectWriter {
       // Write out all records if non-empty
       if (!bufferedRecords.isEmpty()) {
         writeStatuses = writeClient.bulkInsertPreppedRecords(
-            bufferedRecords.values().stream().collect(Collectors.toList()),
-            instantTime, Option.empty());
-        /*writeStatuses = writeClient.insertPreppedRecords(
-            bufferedRecords.values().stream().collect(Collectors.toList()),
-            instantTime);*/
+          bufferedRecords.values().stream().collect(Collectors.toList()),
+        instantTime, Option.empty());
       }
       bufferedRecords.close();
+      LOG.info("Flushed hudi records and got writeStatuses: "
+          + writeStatuses);
       return writeStatuses;
     } catch (Exception e) {
       throw new HoodieException("Write records failed", e);

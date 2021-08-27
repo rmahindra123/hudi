@@ -26,16 +26,24 @@ package org.apache.hudi.connect.core;
 public class CoordinatorEvent {
 
   private final CoordinatorEventType eventType;
+  private final String topicName;
   private final String commitTime;
   private ControlEvent message;
 
-  public CoordinatorEvent(CoordinatorEventType eventType, String commitTime) {
+  public CoordinatorEvent(CoordinatorEventType eventType,
+                          String topicName,
+                          String commitTime) {
     this.eventType = eventType;
+    this.topicName = topicName;
     this.commitTime = commitTime;
   }
 
   public CoordinatorEventType getEventType() {
     return eventType;
+  }
+
+  public String getTopicName() {
+    return topicName;
   }
 
   public String getCommitTime() {

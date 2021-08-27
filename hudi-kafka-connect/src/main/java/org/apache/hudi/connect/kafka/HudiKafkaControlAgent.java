@@ -28,6 +28,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.slf4j.Logger;
@@ -35,6 +36,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -60,17 +63,19 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
   private final String bootstrapServers;
   private final String controlTopicName;
   private final ExecutorService executorService;
-  private final ConcurrentLinkedQueue<TransactionParticipant> partitionWorkers;
+  // List of TransactionParticipants per Kafka Topic
+  private final Map<String, ConcurrentLinkedQueue<TransactionParticipant>> partitionWorkers;
   private final KafkaControlProducer producer;
 
-  private TransactionCoordinator transactionCoordinator;
+  private Map<String, TransactionCoordinator> transactionCoordinators;
   private KafkaConsumer<String, ControlEvent> consumer;
 
   public HudiKafkaControlAgent(String bootstrapServers, String controlTopicName) {
     this.bootstrapServers = bootstrapServers;
     this.controlTopicName = controlTopicName;
     this.executorService = Executors.newSingleThreadExecutor();
-    this.partitionWorkers = new ConcurrentLinkedQueue<>();
+    this.transactionCoordinators = new HashMap<>();
+    this.partitionWorkers = new HashMap<>();
     this.producer = new KafkaControlProducer(bootstrapServers, controlTopicName);
     start();
   }
@@ -88,25 +93,26 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
 
   @Override
   public void registerTransactionCoordinator(TransactionCoordinator leader) {
-    transactionCoordinator = leader;
+    transactionCoordinators.put(leader.getPartition().topic(), leader);
   }
 
   @Override
   public void registerTransactionParticipant(TransactionParticipant worker) {
-    partitionWorkers.add(worker);
+    if (!partitionWorkers.containsKey(worker.getPartition().topic())) {
+      partitionWorkers.put(worker.getPartition().topic(), new ConcurrentLinkedQueue<>());
+    }
+    partitionWorkers.get(worker.getPartition().topic()).add(worker);
   }
 
   @Override
   public void deregisterTransactionCoordinator(TransactionCoordinator leader) {
-    if (leader.equals(transactionCoordinator)) {
-      transactionCoordinator = null;
-    }
+    transactionCoordinators.remove(leader.getPartition().topic());
   }
 
   @Override
   public void deregisterTransactionParticipant(TransactionParticipant worker) {
-    if (worker != null) {
-      partitionWorkers.remove(worker);
+    if (partitionWorkers.containsKey(worker.getPartition().topic())) {
+      partitionWorkers.get(worker.getPartition().topic()).remove(worker);
     }
   }
 
@@ -128,7 +134,7 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
     props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
     consumer = new KafkaConsumer<>(props, new StringDeserializer(),
-            new KafkaJsonDeserializer<>(ControlEvent.class));
+        new KafkaJsonDeserializer<>(ControlEvent.class));
 
     consumer.subscribe(Collections.singletonList(controlTopicName));
 
@@ -142,18 +148,20 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
                 "", record.topic(), record.partition(), record.offset(),
                 record.key(), record.value());
             ControlEvent message = record.value();
-            if (transactionCoordinator != null && message != null) {
-              transactionCoordinator.publishControlEvent(message);
+            String senderTopic = message.senderPartition().topic();
+            if (transactionCoordinators.containsKey(senderTopic)) {
+              transactionCoordinators.get(senderTopic).publishControlEvent(message);
             }
-            for (TransactionParticipant partitionWorker : partitionWorkers) {
-              int partitionReceiver = partitionWorker.getPartition().partition();
-              // Avoid sending back messages to the sender partition,
-              // except for partition 0 that will have both a leader and worker
-              if (message != null
-                  && ((partitionReceiver == 0)
-                  || (partitionReceiver != message.getSenderPartition()
-                  && partitionReceiver > 0))) {
-                partitionWorker.publishControlEvent(message);
+            if (partitionWorkers.containsKey(senderTopic)) {
+              for (TransactionParticipant partitionWorker : partitionWorkers.get(senderTopic)) {
+                TopicPartition partitionReceiver = partitionWorker.getPartition();
+                // Avoid sending back messages to the sender partition,
+                // except for partition 0 that will have both a leader and worker
+                if (partitionReceiver.partition() == 0
+                    || (partitionReceiver != message.senderPartition()
+                    && partitionReceiver.partition() > 0)) {
+                  partitionWorker.publishControlEvent(message);
+                }
               }
             }
           } catch (Exception e) {
@@ -193,6 +201,7 @@ public class HudiKafkaControlAgent implements KafkaControlAgent {
 
   /**
    * Deserializes the incoming Kafka records for the Control Topic.
+   *
    * @param <T> represents the object that is sent over the Control Topic.
    */
   public static class KafkaJsonDeserializer<T> implements Deserializer<T> {

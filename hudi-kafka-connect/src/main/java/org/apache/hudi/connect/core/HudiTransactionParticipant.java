@@ -18,7 +18,7 @@
 
 package org.apache.hudi.connect.core;
 
-import org.apache.hudi.common.util.SerializationUtils;
+import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.connect.writers.HudiConnectConfigs;
 import org.apache.hudi.connect.kafka.KafkaControlAgent;
 import org.apache.hudi.connect.writers.HudiConnectWriterProvider;
@@ -31,7 +31,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -165,16 +167,16 @@ public class HudiTransactionParticipant implements TransactionParticipant {
       context.pause(partition);
       ongoingTransactionInfo.commitInitiated();
       //sendWriterStatus
-      byte[] writeStatuses = new byte[0];
+      List<WriteStatus> writeStatuses = new ArrayList<>();
       try {
-        writeStatuses = SerializationUtils.serialize(ongoingTransactionInfo.getWriter().close());
+        writeStatuses = ongoingTransactionInfo.getWriter().close();
       } catch (IOException exception) {
         LOG.error("WNI OMG OMG SERIALIZATION ERROR", exception);
       }
 
       ControlEvent writeStatus = new ControlEvent.Builder(ControlEvent.MsgType.WRITE_STATUS,
           ongoingTransactionInfo.getCommitTime(),
-          partition.partition())
+          partition)
           .setParticipantInfo(new ControlEvent.ParticipantInfo(
               writeStatuses,
               ongoingTransactionInfo.getLastWrittenKafkaOffset(),

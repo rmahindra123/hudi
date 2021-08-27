@@ -22,12 +22,13 @@ import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.util.SerializationUtils;
 import org.apache.hudi.common.util.collection.BitCaskDiskMap;
 
+import org.apache.kafka.common.TopicPartition;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -45,7 +46,7 @@ public class ControlEvent implements Serializable {
 
   private MsgType msgType;
   private String commitTime;
-  private int senderPartition;
+  private byte[] senderPartition;
   private CoordinatorInfo coordinatorInfo;
   private ParticipantInfo participantInfo;
 
@@ -54,7 +55,7 @@ public class ControlEvent implements Serializable {
 
   public ControlEvent(MsgType msgType,
                       String commitTime,
-                      int senderPartition,
+                      byte[] senderPartition,
                       CoordinatorInfo coordinatorInfo,
                       ParticipantInfo participantInfo) {
     this.msgType = msgType;
@@ -76,8 +77,12 @@ public class ControlEvent implements Serializable {
     return commitTime;
   }
 
-  public int getSenderPartition() {
+  public byte[] getSenderPartition() {
     return senderPartition;
+  }
+
+  public TopicPartition senderPartition() {
+    return SerializationUtils.deserialize(senderPartition);
   }
 
   public CoordinatorInfo getCoordinatorInfo() {
@@ -90,7 +95,7 @@ public class ControlEvent implements Serializable {
 
   @Override
   public String toString() {
-    return String.format("%s %s %s %s %s", msgType.name(), commitTime, senderPartition, coordinatorInfo.toString(), participantInfo.toString());
+    return String.format("%s %s %s %s %s", msgType.name(), commitTime, Arrays.toString(senderPartition), coordinatorInfo.toString(), participantInfo.toString());
   }
 
   /**
@@ -100,14 +105,14 @@ public class ControlEvent implements Serializable {
 
     private final MsgType msgType;
     private final String commitTime;
-    private final int senderPartition;
+    private final byte[] senderPartition;
     private CoordinatorInfo coordinatorInfo;
     private ParticipantInfo participantInfo;
 
-    public Builder(MsgType msgType, String commitTime, int senderPartition) {
+    public Builder(MsgType msgType, String commitTime, TopicPartition senderPartition) throws IOException {
       this.msgType = msgType;
       this.commitTime = commitTime;
-      this.senderPartition = senderPartition;
+      this.senderPartition = SerializationUtils.serialize(senderPartition);
     }
 
     public Builder setCoodinatorInfo(CoordinatorInfo coordinatorInfo) {
@@ -158,14 +163,18 @@ public class ControlEvent implements Serializable {
     public ParticipantInfo() {
     }
 
-    public ParticipantInfo(byte[] writeStatusList, long kafkaCommitOffset, OutcomeType outcomeType) {
-      this.writeStatusList = writeStatusList;
+    public ParticipantInfo(List<WriteStatus> writeStatuses, long kafkaCommitOffset, OutcomeType outcomeType) throws IOException {
+      this.writeStatusList = SerializationUtils.serialize(writeStatuses);
       this.kafkaCommitOffset = kafkaCommitOffset;
       this.outcomeType = outcomeType;
     }
 
     public byte[] getWriteStatusList() {
       return writeStatusList;
+    }
+
+    public List<WriteStatus> writeStatuses() {
+      return SerializationUtils.deserialize(writeStatusList);
     }
 
     public long getKafkaCommitOffset() {
