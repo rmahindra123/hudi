@@ -97,6 +97,7 @@ object HoodieSparkUtils extends SparkAdapterSupport {
     val dfWriteSchema = AvroConversionUtils.convertStructTypeToAvroSchema(df.schema, structName, recordNamespace)
     var writeSchema : Schema = null;
     var toReconcileSchema : Schema = null;
+    println("WNI VIMP 1")
     if (reconcileToLatestSchema && latestTableSchema.isPresent) {
       // if reconcileToLatestSchema is set to true and latestSchema is present, then try to leverage latestTableSchema.
       // this code path will handle situations where records are serialized in odl schema, but callers wish to convert
@@ -124,12 +125,26 @@ object HoodieSparkUtils extends SparkAdapterSupport {
     // Note: deserializer.deserializeRow(row) is not capable of handling evolved schema. i.e. if Row was serialized in
     // old schema, but deserializer was created with an encoder with evolved schema, deserialization fails.
     // Hence we always need to deserialize in the same schema as serialized schema.
-    df.queryExecution.toRdd.map(row => deserializer.deserializeRow(row))
+    println("WNI 22")
+    df.queryExecution.toRdd.map(row => {
+      println("WNI HMMM11 " + row.anyNull)
+      deserializer.deserializeRow(row)
+    })
       .mapPartitions { records =>
-        if (records.isEmpty) Iterator.empty
+        if (records.isEmpty) {
+          println("WNI HMMM22")
+          Iterator.empty
+        }
         else {
+          println("WNI REALLY11??")
           val convertor = AvroConversionHelper.createConverterToAvro(reconciledDataType, structName, recordNamespace)
-          records.map { x => convertor(x).asInstanceOf[GenericRecord] }
+          println("WNI REALLY22??")
+          records.map {
+            x => {
+              println("WNI VVIMP ")
+              convertor(x).asInstanceOf[GenericRecord]
+            }
+          }
         }
       }
   }

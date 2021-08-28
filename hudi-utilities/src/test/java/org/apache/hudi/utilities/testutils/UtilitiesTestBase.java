@@ -315,7 +315,7 @@ public class UtilitiesTestBase {
     }
 
     public static TypedProperties setupSchemaOnDFS() throws IOException {
-      return setupSchemaOnDFS("delta-streamer-config", "source.avsc");
+      return setupSchemaOnDFS("delta-streamer-config", "source-flattened.avsc");
     }
 
     public static TypedProperties setupSchemaOnDFS(String scope, String filename) throws IOException {

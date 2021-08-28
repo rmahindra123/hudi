@@ -31,9 +31,12 @@ import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.sql.DataFrameReader;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.avro.SchemaConverters;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.streaming.kafka010.KafkaUtils;
 import org.apache.spark.streaming.kafka010.LocationStrategies;
 import org.apache.spark.streaming.kafka010.OffsetRange;
@@ -48,6 +51,7 @@ public class JsonKafkaRowSource extends RowSource {
   private final KafkaOffsetGen offsetGen;
 
   private final HoodieDeltaStreamerMetrics metrics;
+  private final StructType sourceSchema;
 
   public JsonKafkaRowSource(TypedProperties properties, JavaSparkContext sparkContext, SparkSession sparkSession,
                          SchemaProvider schemaProvider, HoodieDeltaStreamerMetrics metrics) {
@@ -56,6 +60,12 @@ public class JsonKafkaRowSource extends RowSource {
     properties.put("key.deserializer", StringDeserializer.class);
     properties.put("value.deserializer", StringDeserializer.class);
     offsetGen = new KafkaOffsetGen(properties);
+    if (schemaProvider != null) {
+      sourceSchema = (StructType) SchemaConverters.toSqlType(schemaProvider.getSourceSchema())
+          .dataType();
+    } else {
+      sourceSchema = null;
+    }
   }
 
   @Override
@@ -67,7 +77,14 @@ public class JsonKafkaRowSource extends RowSource {
       return new ImmutablePair<>(Option.empty(), KafkaOffsetGen.CheckpointUtils.offsetsToStr(offsetRanges));
     }
     JavaRDD<String> newDataRDD = toRDD(offsetRanges);
-    Dataset<Row> newDataSet = sparkSession.sqlContext().read().json(newDataRDD);
+    DataFrameReader dataFrameReader = sparkSession.read().format("json");
+    if (sourceSchema != null) {
+      // Source schema is specified, pass it to the reader
+      dataFrameReader.schema(sourceSchema);
+    }
+    dataFrameReader.option("inferSchema", Boolean.toString(sourceSchema == null));
+    Dataset<Row> newDataSet = dataFrameReader.json(newDataRDD.rdd());
+
     return new ImmutablePair<>(Option.of(newDataSet), KafkaOffsetGen.CheckpointUtils.offsetsToStr(offsetRanges));
   }
 
