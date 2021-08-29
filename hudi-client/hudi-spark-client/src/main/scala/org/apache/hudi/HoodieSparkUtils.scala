@@ -125,7 +125,7 @@ object HoodieSparkUtils extends SparkAdapterSupport {
     // Note: deserializer.deserializeRow(row) is not capable of handling evolved schema. i.e. if Row was serialized in
     // old schema, but deserializer was created with an encoder with evolved schema, deserialization fails.
     // Hence we always need to deserialize in the same schema as serialized schema.
-    println("WNI 22")
+    println("WNI 22 " + writeDataType.toString())
     df.queryExecution.toRdd.map(row => {
       println("WNI HMMM11 " + row.anyNull)
       deserializer.deserializeRow(row)

@@ -63,6 +63,7 @@ public class JsonKafkaRowSource extends RowSource {
     if (schemaProvider != null) {
       sourceSchema = (StructType) SchemaConverters.toSqlType(schemaProvider.getSourceSchema())
           .dataType();
+      System.out.println("WNI SCHEMA " + sourceSchema.toString());
     } else {
       sourceSchema = null;
     }

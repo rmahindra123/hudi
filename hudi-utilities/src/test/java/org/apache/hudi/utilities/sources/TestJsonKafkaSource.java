@@ -73,7 +73,8 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
 
   private static String TEST_TOPIC_NAME = "hoodie_test";
 
-  private FilebasedSchemaProvider filebasedSchemaProvider;
+  private FilebasedSchemaProvider flattedFilebasedSchemaProvider;
+  private FilebasedSchemaProvider nestedFilebasedSchemaProvider;
   private KafkaTestUtils testUtils;
   private HoodieDeltaStreamerMetrics metrics = mock(HoodieDeltaStreamerMetrics.class);
 
@@ -90,7 +91,8 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
   @BeforeEach
   public void setup() throws Exception {
     super.setup();
-    filebasedSchemaProvider = new FilebasedSchemaProvider(Helpers.setupSchemaOnDFS(), jsc);
+    flattedFilebasedSchemaProvider = new FilebasedSchemaProvider(Helpers.setupFlattenedSchemaOnDFS(), jsc);
+    nestedFilebasedSchemaProvider = new FilebasedSchemaProvider(Helpers.setupSchemaOnDFS(), jsc);
     testUtils = new KafkaTestUtils();
     testUtils.setup();
   }
@@ -116,9 +118,22 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
 
   @ParameterizedTest
   @MethodSource("testArguments")
-  public void testJsonKafkaSource(String sourceClass, boolean isSchemaProvided) {
+  public void testJsonKafkaSource(String sourceClass, SCHEMA_TYPE schemaType) {
     // topic setup.
-    SchemaProvider schemaProvider = isSchemaProvided ? filebasedSchemaProvider : null;
+    SchemaProvider schemaProvider;// = isSchemaProvided ? filebasedSchemaProvider : null;
+
+    switch (schemaType) {
+      case NONE:
+        schemaProvider = null;
+        break;
+      case FLATTENED:
+        schemaProvider = flattedFilebasedSchemaProvider;
+        break;
+      case NESTED:
+      default:
+        schemaProvider = nestedFilebasedSchemaProvider;
+        break;
+    }
 
     testUtils.createTopic(TEST_TOPIC_NAME, 2);
     HoodieTestDataGenerator dataGenerator = new HoodieTestDataGenerator();
@@ -132,9 +147,10 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
 
     // 1. Extract without any checkpoint => get all the data, respecting sourceLimit
     assertEquals(Option.empty(), kafkaSource.fetchNewDataInAvroFormat(Option.empty(), Long.MAX_VALUE).getBatch());
-    String[] messages = Helpers.jsonifyRecords(dataGenerator.generateInserts("000", 1, true));
+    String[] messages = Helpers.jsonifyRecords(dataGenerator.generateInserts("000", 1, schemaType.equals(SCHEMA_TYPE.FLATTENED)));
     System.out.println("WNI MESS " + messages[0]);
-    testUtils.sendMessages(TEST_TOPIC_NAME, messages);
+    String message = "{\"timestamp\": 0, \"_row_key\": \"531cefe8-ccec-4746-a961-e63353b03b29\", \"partition_path\": \"2015/03/16\", \"rider\": \"rider-000\", \"driver\": \"driver-000\", \"begin_lat\": 0.18433112391820694, \"begin_lon\": 0.4457079093559174, \"end_lat\": 0.38128402026859787, \"end_lon\": 0.4528353922784837, \"distance_in_meters\": 806140026, \"seconds_since_epoch\": -606602876908456549, \"weight\": 0.34158283, \"current_date\": 18867, \"current_ts\": 1630134406124, \"city_to_state\": {\"LA\": \"CA\"}, \"_hoodie_is_deleted\": false}";
+    testUtils.sendMessages(TEST_TOPIC_NAME, new String[] {message});
     InputBatch<JavaRDD<GenericRecord>> fetch1 = kafkaSource.fetchNewDataInAvroFormat(Option.empty(), 900);
     assertFalse(fetch1.getBatch().get().isEmpty());
     //assertEquals(900, fetch1.getBatch().get().count());
@@ -213,7 +229,7 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
     TypedProperties props = createPropsForJsonSource(Long.MAX_VALUE, "earliest");
 
 //Source jsonSource = new JsonKafkaSource(props, jsc, sparkSession, schemaProvider, metrics);
-    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, filebasedSchemaProvider, metrics);
+    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, nestedFilebasedSchemaProvider, metrics);
     SourceFormatAdapter kafkaSource = new SourceFormatAdapter(jsonSource);
 
     /*
@@ -239,7 +255,7 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
     TypedProperties props = createPropsForJsonSource(Long.MAX_VALUE, "earliest");
 
 //Source jsonSource = new JsonKafkaSource(props, jsc, sparkSession, schemaProvider, metrics);
-    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, filebasedSchemaProvider, metrics);
+    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, nestedFilebasedSchemaProvider, metrics);
     SourceFormatAdapter kafkaSource = new SourceFormatAdapter(jsonSource);
     props.setProperty("hoodie.deltastreamer.kafka.source.maxEvents", "500");
 
@@ -269,7 +285,7 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
     TypedProperties props = createPropsForJsonSource(500L, "earliest");
 
 //Source jsonSource = new JsonKafkaSource(props, jsc, sparkSession, schemaProvider, metrics);
-    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, filebasedSchemaProvider, metrics);
+    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, nestedFilebasedSchemaProvider, metrics);
     SourceFormatAdapter kafkaSource = new SourceFormatAdapter(jsonSource);
 
     // 1. Extract without any checkpoint => get all the data, respecting sourceLimit
@@ -319,7 +335,7 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
     TypedProperties props = createPropsForJsonSource(null, "earliest");
     props.put(ENABLE_KAFKA_COMMIT_OFFSET.key(), "true");
 //Source jsonSource = new JsonKafkaSource(props, jsc, sparkSession, schemaProvider, metrics);
-    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, filebasedSchemaProvider, metrics);
+    Source jsonSource = new JsonKafkaRowSource(props, jsc, sparkSession, nestedFilebasedSchemaProvider, metrics);
     SourceFormatAdapter kafkaSource = new SourceFormatAdapter(jsonSource);
 
     // 1. Extract without any checkpoint => get all the data, respecting sourceLimit
@@ -367,11 +383,18 @@ public class TestJsonKafkaSource extends UtilitiesTestBase {
   }
 
   private static Stream<Arguments> testArguments() {
-    // Arguments : 1. Kafka Source Type 2. true if schemaProvider is provided
+    // Arguments : 1. Kafka Source Type 2. type of Schema
     return Stream.of(
-        arguments(JsonKafkaRowSource.class.getName(), true)
-        //arguments(JsonKafkaRowSource.class.getName(), false),
-        //arguments(JsonKafkaSource.class.getName(), true)
+        arguments(JsonKafkaRowSource.class.getName(), SCHEMA_TYPE.NESTED)
+        //arguments(JsonKafkaRowSource.class.getName(), SCHEMA_TYPE.NONE),
+        //arguments(JsonKafkaRowSource.class.getName(), SCHEMA_TYPE.FLATTENED),
+        //arguments(JsonKafkaSource.class.getName(), SCHEMA_TYPE.NESTED)
     );
+  }
+
+  private enum SCHEMA_TYPE {
+    NONE,
+    FLATTENED,
+    NESTED
   }
 }
