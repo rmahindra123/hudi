@@ -33,8 +33,6 @@ import org.apache.kafka.connect.sink.SinkTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,8 +47,6 @@ public class HudiSinkTask extends SinkTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(HudiSinkTask.class);
   public static final String TASK_ID_CONFIG_NAME = "task.id";
-  // ToDo fetch dynamically
-  private static final int NUM_PARTITIONS = 4;
 
   private final Map<TopicPartition, HudiTransactionParticipant> hudiTransactionParticipants;
   private HudiTransactionCoordinator hudiTransactionCoordinator;
@@ -99,9 +95,9 @@ public class HudiSinkTask extends SinkTask {
       hudiTransactionParticipants.get(tp).buffer(record);
     }
 
-    for (TopicPartition partition : context.assignment()) {
+    /*for (TopicPartition partition : context.assignment()) {
       hudiTransactionParticipants.get(partition).processRecords();
-    }
+    }*/
   }
 
   @Override

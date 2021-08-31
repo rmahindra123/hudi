@@ -188,7 +188,7 @@ public class HudiTransactionCoordinator extends TransactionCoordinator {
       submitEvent(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.END_COMMIT,
               partition.topic(),
               currentCommitTime),
-          COMMIT_INTERVAL_MINS, TimeUnit.MINUTES);
+          COMMIT_INTERVAL_MINS * 10, TimeUnit.SECONDS);
     } catch (Exception exception) {
       LOG.error("Failed to start a new commit {}, will retry", currentCommitTime, exception);
       submitEvent(new CoordinatorEvent(CoordinatorEvent.CoordinatorEventType.START_COMMIT,

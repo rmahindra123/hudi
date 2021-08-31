@@ -1,7 +1,6 @@
 package org.apache.hudi.connect.writers;
 
 import org.apache.hudi.DataSourceUtils;
-import org.apache.hudi.HoodieWriterUtils;
 import org.apache.hudi.client.WriteStatus;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.fs.FSUtils;
@@ -15,11 +14,13 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.hive.HiveSyncConfig;
+import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.sync.common.AbstractSyncTool;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,14 +45,16 @@ public class ConnectTransactionServicesProvider extends HudiConnectWriterProvide
     super(connectConfigs, new TopicPartition("", -1));
     // initialize the table, if not done already
     Path path = new Path(tableBasePath);
-    String partitionColumns = HoodieWriterUtils.getPartitionColumns(keyGenerator);
+    syncHive();
+    // ToDo shld try to avoid spark dependency
+    //String partitionColumns = HoodieSparkUtils.getPartitionColumns(keyGenerator, connectConfigs.getProps());
     try {
       tableMetaClient = Option.of(HoodieTableMetaClient.withPropertyBuilder()
           .setTableType(HoodieTableType.COPY_ON_WRITE.name())
           .setTableName(tableName)
           .setPayloadClassName(HoodieAvroPayload.class.getName())
           //.setBaseFileFormat()
-          .setPartitionFields(partitionColumns)
+          //.setPartitionFields(partitionColumns)
           //.setRecordKeyFields()
           .setKeyGeneratorClassProp(writeConfig.getKeyGeneratorClass())
           //.setPreCombineField()
@@ -122,8 +125,8 @@ public class ConnectTransactionServicesProvider extends HudiConnectWriterProvide
         + hiveSyncConfig.jdbcUrl
         + ", basePath :" + tableBasePath);
     LOG.info("Hive Sync Conf => " + hiveSyncConfig.toString());
-    //HiveConf hiveConf = new HiveConf(fs.getConf(), HiveConf.class);
-    //LOG.info("Hive Conf => " + hiveConf.getAllProperties().toString());
-    //new HiveSyncTool(hiveSyncConfig, hiveConf, fs).syncHoodieTable();
+    HiveConf hiveConf = new HiveConf(fs.getConf(), HiveConf.class);
+    LOG.info("Hive Conf => " + hiveConf.getAllProperties().toString());
+    new HiveSyncTool(hiveSyncConfig, hiveConf, fs).syncHoodieTable();
   }
 }

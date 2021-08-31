@@ -29,12 +29,9 @@ import org.apache.hudi.common.table.timeline.HoodieInstant;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.NumericUtils;
 import org.apache.hudi.common.util.Option;
-import org.apache.hudi.common.util.ReflectionUtils;
 import org.apache.hudi.common.util.collection.ImmutablePair;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieWriteConfig;
-import org.apache.hudi.fileid.FileIdPrefixProvider;
-import org.apache.hudi.fileid.KafkaConnectFileIdPrefixProvider;
 import org.apache.hudi.table.HoodieTable;
 import org.apache.hudi.table.WorkloadProfile;
 import org.apache.hudi.table.WorkloadStat;
@@ -54,7 +51,7 @@ import java.util.stream.Collectors;
 /**
  * Packs incoming records to be upserted, into buckets.
  */
-public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements Partitioner {
+public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements Partitioner  {
 
   private static final Logger LOG = LogManager.getLogger(JavaUpsertPartitioner.class);
 
@@ -148,7 +145,7 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
         List<Long> recordsPerBucket = new ArrayList<>();
 
         // first try packing this into one of the smallFiles
-        /*for (SmallFile smallFile : smallFiles) {
+        for (SmallFile smallFile : smallFiles) {
           long recordsToAppend = Math.min((config.getParquetMaxFileSize() - smallFile.sizeBytes) / averageRecordSize,
               totalUnassignedInserts);
           if (recordsToAppend > 0) {
@@ -165,7 +162,7 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
             recordsPerBucket.add(recordsToAppend);
             totalUnassignedInserts -= recordsToAppend;
           }
-        }*/
+        }
 
         // if we have anything more, create new insert buckets, like normal
         if (totalUnassignedInserts > 0) {
@@ -184,12 +181,7 @@ public class JavaUpsertPartitioner<T extends HoodieRecordPayload<T>> implements 
             } else {
               recordsPerBucket.add(totalUnassignedInserts - (insertBuckets - 1) * insertRecordsPerBucket);
             }
-
-            FileIdPrefixProvider fileIdPrefixProvider = (FileIdPrefixProvider) ReflectionUtils.loadClass(
-                config.getFileIdPrefixProviderClassName(),
-                config.getProps());
-
-            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, fileIdPrefixProvider.createFilePrefix(partitionPath), partitionPath);
+            BucketInfo bucketInfo = new BucketInfo(BucketType.INSERT, FSUtils.createNewFileIdPfx(), partitionPath);
             bucketInfoMap.put(totalBuckets, bucketInfo);
             totalBuckets++;
           }

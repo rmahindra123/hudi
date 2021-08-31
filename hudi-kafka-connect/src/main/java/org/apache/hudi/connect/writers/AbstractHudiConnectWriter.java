@@ -11,11 +11,15 @@ import org.apache.hudi.utilities.sources.helpers.AvroConvertor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.kafka.connect.sink.SinkRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
 
 public abstract class AbstractHudiConnectWriter {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractHudiConnectWriter.class);
 
   private final HudiConnectConfigs connectConfigs;
   private final KeyGenerator keyGenerator;
@@ -48,6 +52,7 @@ public abstract class AbstractHudiConnectWriter {
         throw new IOException("Unsupported Kafka Format type (" + connectConfigs.getKafkaValueConverter() + ")");
     }
 
+    LOG.error("WNI VIMP " + avroRecord.get().toString());
     HoodieRecord hudiRecord = new HoodieRecord<>(keyGenerator.getKey(avroRecord.get()), new HoodieAvroPayload(avroRecord));
     writeHudiRecord(hudiRecord);
   }
