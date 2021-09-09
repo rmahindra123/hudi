@@ -39,7 +39,6 @@ import org.apache.hudi.AvroConversionUtils;
 import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
-import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.utilities.deltastreamer.HoodieDeltaStreamerMetrics;
 import org.apache.hudi.utilities.schema.SchemaProvider;
 import org.apache.hudi.utilities.sources.helpers.KafkaOffsetGen;
@@ -103,13 +102,13 @@ public class DebeziumSource extends RowSource {
     String overrideCheckpointStr = props.getString(OVERRIDE_CHECKPOINT_STRING, "");
 
     // Adds a check to ensure streaming is never the first commit in a Hudi Table
-    if (!lastCkptStr.isPresent() && !isInitialCheckpoint) {
+    /*if (!lastCkptStr.isPresent() && !isInitialCheckpoint) {
       throw new HoodieException("Debezium streaming requires a previous kafka offset to begin from.");
     } else if (lastCkptStr.isPresent() && isInitialCheckpoint) {
       throw new HoodieException("There exists a previous commit, but this must be the first commit for the Hudi table.");
     } else if (!isInitialCheckpoint && !overrideCheckpointStr.isEmpty()) {
       throw new HoodieException("Cannot override checkpoint for commit that is not the first.");
-    }
+    }*/
 
     OffsetRange[] offsetRanges = offsetGen.getNextOffsetRanges(lastCkptStr, sourceLimit, metrics);
     long totalNewMsgs = CheckpointUtils.totalNewMessages(offsetRanges);
