@@ -13,6 +13,7 @@
 		"hoodie.datasource.write.recordkey.field": "volume",
 		"hoodie.datasource.write.partitionpath.field": "date",
 		"hoodie.schemaprovider.class": "org.apache.hudi.schema.SchemaRegistryProvider",
-		"hoodie.deltastreamer.schemaprovider.registry.url": "http://localhost:8081/subjects/hudi-test-topic/versions/latest"
+		"hoodie.deltastreamer.schemaprovider.registry.url": "http://localhost:8081/subjects/hudi-test-topic/versions/latest",
+		"hoodie.kafka.commit.interval.secs": 12
     }
 }
