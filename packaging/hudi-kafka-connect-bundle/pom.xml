@@ -73,10 +73,12 @@
                                     <include>org.apache.hudi:hudi-client-common</include>
                                     <include>org.apache.hudi:hudi-java-client</include>
                                     <include>org.apache.hudi:hudi-spark-client</include>
+                                    <include>org.apache.hudi:hudi-spark-common_${scala.binary.version}</include>
                                     <include>org.apache.hudi:hudi-kafka-connect</include>
                                     <include>org.apache.hudi:hudi-utilities_${scala.binary.version}</include>
                                     <include>org.apache.hudi:hudi-hive-sync</include>
                                     <include>org.apache.hudi:hudi-sync-common</include>
+                                    <include>org.apache.hudi:hudi-hadoop-mr</include>
                                     <include>org.apache.hudi:hudi-timeline-service</include>
 
                                     <!-- NOTE: This is temp (SchemaProvide dep) until PR3162 lands -->
@@ -95,22 +97,7 @@
                                     <include>org.apache.httpcomponents:httpclient</include>
                                     <include>org.apache.httpcomponents:httpcore</include>
                                     <include>org.apache.httpcomponents:fluent-hc</include>
-                                    <!-- Spark only has mortbay jetty -->
-                                    <!--
 
-
-
-                                    <include>org.antlr:stringtemplate</include>
-                                     <include>org.apache.parquet:parquet-avro</include> -->
-
-                                    <!--<include>com.twitter:bijection-avro_${scala.binary.version}</include>
-                                    <include>com.twitter:bijection-core_${scala.binary.version}</include>
-                                    <include>io.confluent:kafka-avro-serializer</include>
-                                    <include>io.confluent:kafka-schema-serializer</include>
-                                    <include>io.confluent:common-config</include>
-                                    <include>io.confluent:common-utils</include>
-                                    <include>io.confluent:kafka-schema-registry-client</include>
-                                    <include>org.apache.kafka:kafka-clients</include>-->
                                     <include>io.dropwizard.metrics:metrics-core</include>
                                     <include>io.dropwizard.metrics:metrics-graphite</include>
                                     <include>io.prometheus:simpleclient</include>
@@ -123,66 +110,106 @@
                                     <include>org.objenesis:objenesis</include>
                                     <include>com.esotericsoftware:kryo-shaded</include>
                                     <include>com.esotericsoftware:minlog</include>
-                                    <!--<include>org.apache.kafka:kafka_${scala.binary.version}</include>
-                                    <include>com.101tec:zkclient</include>
-                                    <include>org.apache.kafka:kafka-clients</include>
 
+                                    <!--<include>org.apache.hive:hive-common</include>
+                                    <include>org.apache.hive:hive-service</include>
+                                    <include>org.apache.hive:hive-service-rpc</include>
+                                    <include>org.apache.hive:hive-metastore</include>
+                                    <include>org.apache.hive:hive-jdbc</include>-->
 
-                                   <include>org.apache.hive:hive-common</include>
-                                   <include>org.apache.hive:hive-service</include>
-                                   <include>org.apache.hive:hive-service-rpc</include>
-                                   <include>org.apache.hive:hive-metastore</include>
-                                   <include>org.apache.hive:hive-jdbc</include>-->
+                                    <include>org.apache.hbase:hbase-client</include>
+                                    <include>org.apache.hbase:hbase-common</include>
+                                    <include>org.apache.hbase:hbase-protocol</include>
+                                    <include>org.apache.hbase:hbase-server</include>
+                                    <include>org.apache.htrace:htrace-core</include>
 
-                                   <include>org.apache.hbase:hbase-client</include>
-                                   <include>org.apache.hbase:hbase-common</include>
-                                   <include>org.apache.hbase:hbase-protocol</include>
-                                   <include>org.apache.hbase:hbase-server</include>
-                                   <include>org.apache.htrace:htrace-core</include>
-
-                                    <!--<include>org.apache.curator:curator-framework</include>
-                                   <include>org.apache.curator:curator-client</include>
-                                   <include>org.apache.curator:curator-recipes</include>
-                                   <include>commons-codec:commons-codec</include>-->
-
-                                    <include>org.slf4j:slf4j-log4j12</include>
-                               </includes>
-                           </artifactSet>
+                                    <include>org.scala-lang:*</include>
+                                </includes>
+                            </artifactSet>
                             <relocations>
-                            <relocation>
-                                <pattern>com.google.protobuf.</pattern>
-                                <shadedPattern>${kafka.connect.bundle.shade.prefix}com.google.protobuf.</shadedPattern>
-                            </relocation>
+                                <relocation>
+                                    <pattern>com.google.protobuf.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}com.google.protobuf.
+                                    </shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.yammer.metrics.</pattern>
+                                    <shadedPattern>org.apache.hudi.com.yammer.metrics.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>com.beust.jcommander.</pattern>
+                                    <shadedPattern>org.apache.hudi.com.beust.jcommander.</shadedPattern>
+                                </relocation>
+                                <!--<relocation>
+                                    <pattern>org.apache.hive.jdbc.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hive.jdbc.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hadoop.hive.metastore.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.metastore.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hive.common.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hive.common.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hadoop.hive.common.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.common.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hadoop.hive.conf.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.conf.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hive.service.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hive.service.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.hadoop.hive.service.</pattern>
+                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.service.</shadedPattern>
+                                </relocation>-->
+                                <relocation>
+                                    <pattern>com.codahale.metrics.</pattern>
+                                    <shadedPattern>org.apache.hudi.com.codahale.metrics.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.codec.</pattern>
+                                    <shadedPattern>org.apache.hudi.org.apache.commons.codec.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.eclipse.jetty.</pattern>
+                                    <shadedPattern>org.apache.hudi.org.eclipse.jetty.</shadedPattern>
+                                </relocation>
                             </relocations>
-                           <filters>
-                               <filter>
-                                   <artifact>*:*</artifact>
-                                   <excludes>
-                                       <exclude>META-INF/*.SF</exclude>
-                                       <exclude>META-INF/*.DSA</exclude>
-                                       <exclude>META-INF/*.RSA</exclude>
-                                       <exclude>META-INF/services/javax.*</exclude>
-                                   </excludes>
-                               </filter>
-                           </filters>
-                       </configuration>
-                   </execution>
-               </executions>
-           </plugin>
-       </plugins>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/services/javax.*</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
 
-       <resources>
-           <resource>
-               <directory>src/main/resources</directory>
-           </resource>
-           <resource>
-               <directory>src/test/resources</directory>
-           </resource>
-       </resources>
-   </build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>src/test/resources</directory>
+            </resource>
+        </resources>
+    </build>
 
-   <dependencies>
-       <!-- Hudi -->
+    <dependencies>
+        <!-- Hoodie -->
         <dependency>
             <groupId>org.apache.hudi</groupId>
             <artifactId>hudi-kafka-connect</artifactId>
@@ -223,6 +250,22 @@
                     <artifactId>*</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-hive-sync</artifactId>
+            <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.servlet</groupId>
+                    <artifactId>servlet-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hudi</groupId>
+            <artifactId>hudi-spark-common_${scala.binary.version}</artifactId>
+            <version>${project.version}</version>
         </dependency>
 
         <!-- Avro/ Parquet -->
@@ -270,8 +313,85 @@
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-auth</artifactId>
             <version>${hadoop.version}</version>
-            <scope>compile</scope>
         </dependency>
+
+        <!-- Hive -->
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-common</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-metastore</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-jdbc</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-serde</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-shims</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-service</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.apache.hive</groupId>
+                    <artifactId>hive-exec</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hive</groupId>
+            <artifactId>hive-exec</artifactId>
+            <version>${hive.version}</version>
+            <scope>provided</scope>
+            <classifier>${hive.exec.classifier}</classifier>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-collections</groupId>
+                    <artifactId>commons-collections</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>commons-httpclient</groupId>
+                    <artifactId>commons-httpclient</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.hadoop</groupId>
+                    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
     </dependencies>
 </project>
 

@@ -15,6 +15,13 @@
 		"hoodie.datasource.write.partitionpath.field": "date",
 		"hoodie.schemaprovider.class": "org.apache.hudi.schema.SchemaRegistryProvider",
 		"hoodie.deltastreamer.schemaprovider.registry.url": "http://localhost:8081/subjects/hudi-test-topic/versions/latest",
-                "hoodie.metadata.enable": "false"	
+                "hoodie.metadata.enable": "false",
+		"hoodie.kafka.commit.interval.secs": 15,
+		"hoodie.meta.sync.enable": "true",
+		"hoodie.meta.sync.classes": "org.apache.hudi.hive.HiveSyncTool",
+		"hoodie.datasource.hive_sync.table": "sample_table",
+		"hoodie.datasource.hive_sync.partition_fields": "date",
+		"hoodie.datasource.hive_sync.partition_extractor_class" : "org.apache.hudi.hive.MultiPartKeysValueExtractor",
+		"hoodie.datasource.hive_sync.jdbcurl": "jdbc:hive2://hiveserver:10000"
       }
 }
