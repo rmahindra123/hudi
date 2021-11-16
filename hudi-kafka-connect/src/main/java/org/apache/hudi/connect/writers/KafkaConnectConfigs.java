@@ -89,8 +89,6 @@ public class KafkaConnectConfigs extends HoodieConfig {
 
   protected KafkaConnectConfigs(Properties props) {
     super(props);
-    Properties newProps = new Properties();
-    newProps.putAll(props);
   }
 
   public static KafkaConnectConfigs.Builder newBuilder() {
