@@ -47,7 +47,7 @@ fi
 
 ## defaults
 rawDataFile=${HUDI_DIR}/docker/demo/data/batch_1.json
-kafkaTopicName=hudi-test-topic
+kafkaTopicName=hudi-test-topic-2
 numKafkaPartitions=4
 recordKey=volume
 numHudiPartitions=5
@@ -95,21 +95,21 @@ while getopts ":n:f:k:m:r:l:p:s:-:" opt; do
 done
 
 # First delete the existing topic
-${KAFKA_HOME}/bin/kafka-topics.sh --delete --topic ${kafkaTopicName} --bootstrap-server localhost:9092
+${KAFKA_HOME}/bin/kafka-topics.sh --delete --topic ${kafkaTopicName} --bootstrap-server kafkabroker:9092
 
 # Create the topic with 4 partitions
-${KAFKA_HOME}/bin/kafka-topics.sh --create --topic ${kafkaTopicName} --partitions $numKafkaPartitions --replication-factor 1 --bootstrap-server localhost:9092
+${KAFKA_HOME}/bin/kafka-topics.sh --create --topic ${kafkaTopicName} --partitions $numKafkaPartitions --replication-factor 1 --bootstrap-server kafkabroker:9092
 
 # Setup the schema registry
 export SCHEMA=$(sed 's|/\*|\n&|g;s|*/|&\n|g' ${schemaFile} | sed '/\/\*/,/*\//d' | jq tostring)
-curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" --data "{\"schema\": $SCHEMA}" http://localhost:8081/subjects/${kafkaTopicName}/versions
+curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" --data "{\"schema\": $SCHEMA}" http://localhost:8082/subjects/${kafkaTopicName}/versions
 curl -X GET http://localhost:8081/subjects/${kafkaTopicName}/versions/latest
 
 # Generate kafka messages from raw records
 # Each records with unique keys and generate equal messages across each hudi partition
 partitions={}
 for ((i = 0; i < ${numHudiPartitions}; i++)); do
-  partitions[$i]="partition-"$i
+  partitions[$i]="partition_"$i
 done
 
 events_file=/tmp/kcat-input.events
@@ -143,4 +143,4 @@ for (( ; ; )); do
   fi
 done
 
-grep -v '^$' ${events_file} | kcat -P -b localhost:9092 -t hudi-test-topic
+grep -v '^$' ${events_file} | kcat -P -b kafkabroker:9092 -t hudi-test-topic-2

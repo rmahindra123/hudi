@@ -88,6 +88,7 @@ public class KafkaConnectUtils {
   public static Configuration getDefaultHadoopConf() {
     Configuration hadoopConf = new Configuration();
     hadoopConf.set("fs.file.impl", org.apache.hadoop.fs.LocalFileSystem.class.getName());
+    hadoopConf.set("fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem");
     return hadoopConf;
   }
 

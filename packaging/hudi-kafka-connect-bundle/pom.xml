@@ -122,7 +122,6 @@
                                     <include>org.apache.hbase:hbase-protocol</include>
                                     <include>org.apache.hbase:hbase-server</include>
                                     <include>org.apache.htrace:htrace-core</include>
-
                                     <include>org.scala-lang:*</include>
                                 </includes>
                             </artifactSet>
@@ -142,40 +141,40 @@
                                 </relocation>
                                 <!--<relocation>
                                     <pattern>org.apache.hive.jdbc.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hive.jdbc.</shadedPattern>
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hive.jdbc.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.hadoop.hive.metastore.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.metastore.</shadedPattern>
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hadoop.hive.metastore.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.hive.common.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hive.common.</shadedPattern>
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hive.common.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.hadoop.hive.common.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.common.</shadedPattern>
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hadoop.hive.common.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.hadoop.hive.conf.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.conf.</shadedPattern>
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hadoop.hive.conf.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.hive.service.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hive.service.</shadedPattern>
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hive.service.</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.hadoop.hive.service.</pattern>
-                                    <shadedPattern>${kafka.connect.bundle.shade.prefix}org.apache.hadoop.hive.service.</shadedPattern>
-                                </relocation>-->
+                                    <shadedPattern>${utilities.bundle.hive.shade.prefix}org.apache.hadoop.hive.service.</shadedPattern>
+                                </relocation>
                                 <relocation>
                                     <pattern>com.codahale.metrics.</pattern>
                                     <shadedPattern>org.apache.hudi.com.codahale.metrics.</shadedPattern>
-                                </relocation>
-                                <relocation>
+                                </relocation>-->
+                                <!--<relocation>
                                     <pattern>org.apache.commons.codec.</pattern>
                                     <shadedPattern>org.apache.hudi.org.apache.commons.codec.</shadedPattern>
-                                </relocation>
+                                </relocation>-->
                                 <relocation>
                                     <pattern>org.eclipse.jetty.</pattern>
                                     <shadedPattern>org.apache.hudi.org.eclipse.jetty.</shadedPattern>
@@ -317,45 +316,11 @@
 
         <!-- Hive -->
         <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-common</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>${hive.groupid}</groupId>
-            <artifactId>hive-metastore</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>${hive.groupid}</groupId>
-            <artifactId>hive-jdbc</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>${hive.groupid}</groupId>
-            <artifactId>hive-serde</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>${hive.groupid}</groupId>
-            <artifactId>hive-shims</artifactId>
-            <version>${hive.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>${hive.groupid}</groupId>
             <artifactId>hive-service</artifactId>
             <version>${hive.version}</version>
-            <scope>provided</scope>
+            <scope>${utilities.bundle.hive.scope}</scope>
             <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hive</groupId>
-                    <artifactId>hive-exec</artifactId>
-                </exclusion>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
                     <artifactId>slf4j-api</artifactId>
@@ -366,30 +331,40 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
         <dependency>
-            <groupId>org.apache.hive</groupId>
-            <artifactId>hive-exec</artifactId>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-service-rpc</artifactId>
             <version>${hive.version}</version>
-            <scope>provided</scope>
-            <classifier>${hive.exec.classifier}</classifier>
-            <exclusions>
-                <exclusion>
-                    <groupId>commons-collections</groupId>
-                    <artifactId>commons-collections</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>commons-httpclient</groupId>
-                    <artifactId>commons-httpclient</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-yarn-server-resourcemanager</artifactId>
-                </exclusion>
-            </exclusions>
+            <scope>${utilities.bundle.hive.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-jdbc</artifactId>
+            <version>${hive.version}</version>
+            <scope>${utilities.bundle.hive.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-metastore</artifactId>
+            <version>${hive.version}</version>
+            <scope>${utilities.bundle.hive.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>${hive.groupid}</groupId>
+            <artifactId>hive-common</artifactId>
+            <version>${hive.version}</version>
+            <scope>${utilities.bundle.hive.scope}</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.htrace</groupId>
+            <artifactId>htrace-core</artifactId>
+            <version>${htrace.version}</version>
+            <scope>compile</scope>
         </dependency>
 
     </dependencies>

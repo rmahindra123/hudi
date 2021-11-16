@@ -170,7 +170,10 @@ public class KafkaConnectTransactionServices implements ConnectTransactionServic
         + ", basePath :" + tableBasePath);
     LOG.error("Hive Sync Conf => " + hiveSyncConfig.toString());
     FileSystem fs = FSUtils.getFs(tableBasePath, hadoopConf);
-    HiveConf hiveConf = new HiveConf(fs.getConf(), HiveConf.class);
+    HiveConf hiveConf = new HiveConf();
+    hiveConf.addResource(fs.getConf());
+    hiveConf.set("hive.metastore.uris", "thrift://hivemetastore:9083");
+    hiveConf.set("hive.metastore.client.socket.timeout", "1500s");
     LOG.error("Hive Conf => " + hiveConf.getAllProperties().toString());
     new HiveSyncTool(hiveSyncConfig, hiveConf, fs).syncHoodieTable();
   }
