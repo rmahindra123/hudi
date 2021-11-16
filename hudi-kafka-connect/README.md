@@ -27,12 +27,14 @@ The first thing you need to do to start using this connector is building it. In 
 - [Java 1.8+](https://openjdk.java.net/)
 - [Apache Maven](https://maven.apache.org/)
 - Install [kcat](https://github.com/edenhill/kcat)
+= Install jq. `brew install jq`
 
 After installing these dependencies, execute the following commands. This will install all the Hudi dependency jars,
 including the fat packaged jar that contains all the dependencies required for a functional Hudi Kafka Connect Sink.
 
+
 ```bash
-mvn clean -pl packaging/hudi-kafka-connect-bundle install
+mvn package -DskipTests -pl packaging/hudi-kafka-connect-bundle -am
 ```
 
 Next, we need to make sure that the hudi sink connector bundle jar is in Kafka Connect classpath. Note that the connect
@@ -48,30 +50,57 @@ After building the package, we need to install the Apache Kafka
 
 ### 1 - Starting the environment
 
-To try out the Connect Sink locally, set up a Kafka broker locally. Download the latest apache kafka from https://kafka.apache.org/downloads.
-Once downloaded and built, run the Zookeeper server and Kafka server using the command line tools.
+For runtime dependencies, we encourage using the confluent HDFS connector jars. We have tested our setup with version `10.1.0`.
+After downloading the
 
 ```bash
-export KAFKA_HOME=/path/to/kafka_install_dir
-cd $KAFKA_KAFKA_HOME
-./bin/zookeeper-server-start.sh ./config/zookeeper.properties
-./bin/kafka-server-start.sh ./config/server.properties
+confluent-hub install confluentinc/kafka-connect-hdfs:10.1.0
+cp confluentinc-kafka-connect-hdfs-10.1.0/lib/*.jars /usr/local/share/java/hudi-kafka-connect/
 ```
 
-Wait until the kafka cluster is up and running.
+### 2 - Set up the docker containers
 
-### 2 - Set up the schema registry
+To run the connect locally, we need kafka, zookeeper, hdfs, hive etc. To make the setup easier, we use the docker 
+containers from the hudi docker demo. Refer to [this link for the setup](https://hudi.apache.org/docs/docker_demo)
+
+Essentially, follow the steps listed here:
+
+/etc/hosts : The demo references many services running in container by the hostname. Add the following settings to /etc/hosts
+```bash
+127.0.0.1 adhoc-1
+127.0.0.1 adhoc-2
+127.0.0.1 namenode
+127.0.0.1 datanode1
+127.0.0.1 hiveserver
+127.0.0.1 hivemetastore
+127.0.0.1 kafkabroker
+127.0.0.1 sparkmaster
+127.0.0.1 zookeeper
+```
+
+Bring up the docker containers
+```bash
+cd $HUDI_DIR/docker
+./setup_demo.sh
+```
+
+The schema registry and kafka connector can be run from host system directly (mac/ linux).
+
+### 3 - Set up the schema registry
 
 Hudi leverages schema registry to obtain the latest schema when writing records. While it supports most popular schema
 registries, we use Confluent schema registry. Download the latest confluent platform and run the schema registry
-service.
+service. 
+
+NOTE: You might need to change the port from `8081` to `8082`.
 
 ```bash
 cd $CONFLUENT_DIR
+/bin/kafka-configs --zookeeper localhost --entity-type topics --entity-name _schemas --alter --add-config cleanup.policy=compact
 ./bin/schema-registry-start etc/schema-registry/schema-registry.properties
 ```
 
-### 3 - Create the Hudi Control Topic for Coordination of the transactions
+### 4 - Create the Hudi Control Topic for Coordination of the transactions
 
 The control topic should only have `1` partition, since its used to coordinate the Hudi write transactions across the multiple Connect tasks.
 
@@ -152,6 +181,50 @@ total 5168
 -rw-r--r--  1 user  wheel  440219 Sep 13 21:42 D5AEE453699D5D9623D704C1CF399C8C-0_0-0-0_20210913214114.parquet
 -rw-r--r--  1 user  wheel  437035 Sep 13 21:45 D5AEE453699D5D9623D704C1CF399C8C-0_0-0-0_20210913214351.parquet
 -rw-r--r--  1 user  wheel  440214 Sep 13 21:43 E200FA75DCD1CED60BE86BCE6BF5D23A-0_0-0-0_20210913214114.parquet
+```
+
+### 6- Querying via Hive
+
+```bash
+docker exec -it adhoc-2 /bin/bash
+beeline -u jdbc:hive2://hiveserver:10000 \
+  --hiveconf hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat \
+  --hiveconf hive.stats.autogather=false
+
+
+# List Tables
+0: jdbc:hive2://hiveserver:10000> show tables;
++---------------------+--+
+|      tab_name       |
++---------------------+--+
+| hudi-test-topic_ro  |
+| hudi-test-topic_rt  |
++---------------------+--+
+3 rows selected (1.199 seconds)
+0: jdbc:hive2://hiveserver:10000>
+
+
+# Look at partitions that were added
+0: jdbc:hive2://hiveserver:10000> show partitions hudi-test-topic_rt;
++-------------------+--+
+|     partition     |
++-------------------+--+
+| date=partition_0  |
+| date=partition_1  |
+| date=partition_2  |
+| date=partition_3  |
+| date=partition_4  |
++-------------------+--+
+1 row selected (0.24 seconds)
+
+
+0: jdbc:hive2://hiveserver:10000> select `_hoodie_commit_time`, symbol, ts, volume, open, close  from topic_rt;
++----------------------+---------+----------------------+---------+------------+-----------+--+
+| _hoodie_commit_time  | symbol  |          ts          | volume  |    open    |   close   |
++----------------------+---------+----------------------+---------+------------+-----------+--+
+| 20180924222155       | GOOG    | 2018-08-31 09:59:00  | 6330    | 1230.5     | 1230.02   |
+| 20180924222155       | GOOG    | 2018-08-31 10:29:00  | 3391    | 1230.1899  | 1230.085  |
++----------------------+---------+----------------------+---------+------------+-----------+--+
 ```
 
 
