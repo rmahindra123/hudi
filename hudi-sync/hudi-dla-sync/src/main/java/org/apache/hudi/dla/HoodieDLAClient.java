@@ -51,7 +51,6 @@ import java.util.stream.Collectors;
 
 public class HoodieDLAClient extends AbstractSyncHoodieClient {
   private static final Logger LOG = LogManager.getLogger(HoodieDLAClient.class);
-  private static final String HOODIE_LAST_COMMIT_TIME_SYNC = "hoodie_last_sync";
   // Make sure we have the dla JDBC driver in classpath
   private static final String DRIVER_NAME = "com.mysql.jdbc.Driver";
   private static final String DLA_ESCAPE_CHARACTER = "";
@@ -98,6 +97,16 @@ public class HoodieDLAClient extends AbstractSyncHoodieClient {
         throw new HoodieException("Cannot create dla connection ", e);
       }
     }
+  }
+
+  @Override
+  public void createDatabase(String databaseName) {
+    throw new IllegalStateException("This method is not implemented for this class!!");
+  }
+
+  @Override
+  public boolean doesDataBaseExist(String databaseName) {
+    throw new IllegalStateException("This method is not implemented for this class!!");
   }
 
   @Override
@@ -275,6 +284,16 @@ public class HoodieDLAClient extends AbstractSyncHoodieClient {
   }
 
   @Override
+  public void updateTableDefinition(String tableName, MessageType newSchema) {
+
+  }
+
+  @Override
+  public boolean syncPartitions(String tableName, List<String> writtenPartitionsSince) {
+    throw new IllegalStateException("This method is not implemented for this class!!");
+  }
+
+  @Override
   public void updatePartitionsToTable(String tableName, List<String> changedPartitions) {
     if (changedPartitions.isEmpty()) {
       LOG.info("No partitions to change for " + tableName);
@@ -365,6 +384,7 @@ public class HoodieDLAClient extends AbstractSyncHoodieClient {
     }
   }
 
+  @Override
   public void close() {
     try {
       if (connection != null) {

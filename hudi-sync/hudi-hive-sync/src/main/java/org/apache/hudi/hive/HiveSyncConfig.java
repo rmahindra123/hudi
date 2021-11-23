@@ -63,6 +63,9 @@ public class HiveSyncConfig implements Serializable {
       + " exists to support backward compatibility. If you use hoodie 0.3.x, do not set this parameter")
   public Boolean assumeDatePartitioning = false;
 
+  @Parameter(names = "--use-aws-glue-meta", description = "If enabled, the hudi table will get synced with the AWS Glue Meta.")
+  public Boolean isAwsGlueMetaSyncEnabled = false;
+
   @Parameter(names = {"--use-pre-apache-input-format"},
       description = "Use InputFormat under com.uber.hoodie package "
           + "instead of org.apache.hudi package. Use this when you are in the process of migrating from "

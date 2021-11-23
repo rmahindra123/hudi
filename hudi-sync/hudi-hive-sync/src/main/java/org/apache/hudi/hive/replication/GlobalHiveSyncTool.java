@@ -22,6 +22,7 @@ import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.hive.HiveSyncTool;
+import org.apache.hudi.hive.HoodieHiveClient;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -36,8 +37,11 @@ public class GlobalHiveSyncTool extends HiveSyncTool {
 
   private static final Logger LOG = LogManager.getLogger(HiveSyncTool.class);
 
+  private final HoodieHiveClient hoodieHiveClient;
+
   public GlobalHiveSyncTool(GlobalHiveSyncConfig cfg, HiveConf configuration, FileSystem fs) {
     super(cfg, configuration, fs);
+    hoodieHiveClient = (HoodieHiveClient) hiveClient;
   }
 
   @Override

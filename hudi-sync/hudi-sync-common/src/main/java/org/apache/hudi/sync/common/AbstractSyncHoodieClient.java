@@ -46,6 +46,7 @@ public abstract class AbstractSyncHoodieClient {
 
   private static final Logger LOG = LogManager.getLogger(AbstractSyncHoodieClient.class);
 
+  protected static final String HOODIE_LAST_COMMIT_TIME_SYNC = "last_commit_time_sync";
   public static final TypeConverter TYPE_CONVERTOR = new TypeConverter() {};
 
   protected final HoodieTableMetaClient metaClient;
@@ -73,6 +74,14 @@ public abstract class AbstractSyncHoodieClient {
     this.fs = fs;
   }
 
+  public abstract void createDatabase(String databaseName);
+
+  /**
+   * @param databaseName
+   * @return true if the configured database exists
+   */
+  public abstract boolean doesDataBaseExist(String databaseName);
+
   /**
    * Create the table.
    * @param tableName The table name.
@@ -94,9 +103,15 @@ public abstract class AbstractSyncHoodieClient {
 
   public abstract void updateLastCommitTimeSynced(String tableName);
 
+  public abstract void updateTableDefinition(String tableName, MessageType newSchema);
+
+  public abstract boolean syncPartitions(String tableName, List<String> writtenPartitionsSince);
+
   public abstract void addPartitionsToTable(String tableName, List<String> partitionsToAdd);
 
   public abstract void updatePartitionsToTable(String tableName, List<String> changedPartitions);
+
+  public abstract void close();
 
   public  void updateTableProperties(String tableName, Map<String, String> tableProperties) {}
 

@@ -46,12 +46,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.apache.hudi.hadoop.utils.HoodieHiveUtils.GLOBALLY_CONSISTENT_READ_TIMESTAMP;
 
 public class HoodieHiveClient extends AbstractSyncHoodieClient {
 
-  private static final String HOODIE_LAST_COMMIT_TIME_SYNC = "last_commit_time_sync";
   private static final String HIVE_ESCAPE_CHARACTER = HiveSchemaUtil.HIVE_ESCAPE_CHARACTER;
 
   private static final Logger LOG = LogManager.getLogger(HoodieHiveClient.class);
@@ -174,13 +174,31 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
   }
 
   /**
-   * Scan table partitions.
+   * Syncs the list of storage partitions passed in (checks if the partition is in hive, if not adds it or if the
+   * partition path does not match, it updates the partition path).
    */
-  public List<Partition> scanTablePartitions(String tableName) throws TException {
-    return client.listPartitions(syncConfig.databaseName, tableName, (short) -1);
+  @Override
+  public boolean syncPartitions(String tableName, List<String> writtenPartitionsSince) {
+    boolean partitionsChanged;
+    try {
+      List<Partition> hivePartitions = scanTablePartitions(tableName);
+      List<PartitionEvent> partitionEvents =
+          getPartitionEvents(hivePartitions, writtenPartitionsSince);
+      List<String> newPartitions = filterPartitions(partitionEvents, PartitionEvent.PartitionEventType.ADD);
+      LOG.info("New Partitions " + newPartitions);
+      addPartitionsToTable(tableName, newPartitions);
+      List<String> updatePartitions = filterPartitions(partitionEvents, PartitionEvent.PartitionEventType.UPDATE);
+      LOG.info("Changed Partitions " + updatePartitions);
+      updatePartitionsToTable(tableName, updatePartitions);
+      partitionsChanged = !updatePartitions.isEmpty() || !newPartitions.isEmpty();
+    } catch (Exception e) {
+      throw new HoodieHiveSyncException("Failed to sync partitions for table " + tableName, e);
+    }
+    return partitionsChanged;
   }
 
-  void updateTableDefinition(String tableName, MessageType newSchema) {
+  @Override
+  public void updateTableDefinition(String tableName, MessageType newSchema) {
     ddlExecutor.updateTableDefinition(tableName, newSchema);
   }
 
@@ -215,10 +233,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
     }
   }
 
-  /**
-   * @param databaseName
-   * @return true if the configured database exists
-   */
+  @Override
   public boolean doesDataBaseExist(String databaseName) {
     try {
       client.getDatabase(databaseName);
@@ -231,6 +246,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
     }
   }
 
+  @Override
   public void createDatabase(String databaseName) {
     ddlExecutor.createDatabase(databaseName);
   }
@@ -291,6 +307,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
     }
   }
 
+  @Override
   public void close() {
     try {
       ddlExecutor.close();
@@ -318,5 +335,17 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
     } catch (Exception e) {
       throw new HoodieHiveSyncException("Failed to get update last commit time synced to " + lastCommitSynced, e);
     }
+  }
+
+  /**
+   * Scan table partitions.
+   */
+  private List<Partition> scanTablePartitions(String tableName) throws TException {
+    return client.listPartitions(syncConfig.databaseName, tableName, (short) -1);
+  }
+
+  private List<String> filterPartitions(List<PartitionEvent> events, PartitionEvent.PartitionEventType eventType) {
+    return events.stream().filter(s -> s.eventType == eventType).map(s -> s.storagePartition)
+        .collect(Collectors.toList());
   }
 }
