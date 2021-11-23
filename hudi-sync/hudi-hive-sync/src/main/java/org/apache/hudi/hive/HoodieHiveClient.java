@@ -323,7 +323,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
   /**
    * Scan table partitions.
    */
-  List<Partition> scanTablePartitions(String tableName) throws TException {
+  public List<Partition> scanTablePartitions(String tableName) throws TException {
     return client.listPartitions(syncConfig.databaseName, tableName, (short) -1);
   }
 }
