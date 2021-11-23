@@ -41,6 +41,10 @@ public class GlobalHiveSyncTool extends HiveSyncTool {
 
   public GlobalHiveSyncTool(GlobalHiveSyncConfig cfg, HiveConf configuration, FileSystem fs) {
     super(cfg, configuration, fs);
+    if (!(hiveClient instanceof HoodieHiveClient)) {
+      hoodieHiveClient = null;
+      throw new IllegalArgumentException("GlobalHiveSyncTool only support Hive Sync. For Glue meta sync, use HiveSyncTool with the same config");
+    }
     hoodieHiveClient = (HoodieHiveClient) hiveClient;
   }
 

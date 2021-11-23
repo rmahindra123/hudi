@@ -168,10 +168,9 @@ public class TestHiveSyncTool {
         + "` PARTITION (`datestr`='2050-01-01') SET LOCATION '/some/new/location'");
 
     hiveClient = new HoodieHiveClient(hiveSyncConfig, HiveTestUtil.getHiveConf(), fileSystem);
-    List<Partition> hivePartitions = hiveClient.scanTablePartitions(hiveSyncConfig.tableName);
     List<String> writtenPartitionsSince = hiveClient.getPartitionsWrittenToSince(Option.empty());
     //writtenPartitionsSince.add(newPartition.get(0));
-    List<PartitionEvent> partitionEvents = hiveClient.getPartitionEvents(hivePartitions, writtenPartitionsSince);
+    List<PartitionEvent> partitionEvents = hiveClient.getPartitionEvents(hiveSyncConfig.tableName, writtenPartitionsSince);
     assertEquals(1, partitionEvents.size(), "There should be only one partition event");
     assertEquals(PartitionEventType.UPDATE, partitionEvents.iterator().next().eventType,
         "The one partition event must of type UPDATE");
@@ -471,8 +470,7 @@ public class TestHiveSyncTool {
     hiveClient = new HoodieHiveClient(hiveSyncConfig, HiveTestUtil.getHiveConf(), fileSystem);
     List<String> writtenPartitionsSince = hiveClient.getPartitionsWrittenToSince(Option.of(commitTime1));
     assertEquals(1, writtenPartitionsSince.size(), "We should have one partition written after 100 commit");
-    List<Partition> hivePartitions = hiveClient.scanTablePartitions(hiveSyncConfig.tableName);
-    List<PartitionEvent> partitionEvents = hiveClient.getPartitionEvents(hivePartitions, writtenPartitionsSince);
+    List<PartitionEvent> partitionEvents = hiveClient.getPartitionEvents(hiveSyncConfig.tableName, writtenPartitionsSince);
     assertEquals(1, partitionEvents.size(), "There should be only one partition event");
     assertEquals(PartitionEventType.ADD, partitionEvents.iterator().next().eventType, "The one partition event must of type ADD");
 
@@ -701,8 +699,7 @@ public class TestHiveSyncTool {
     hiveClient = new HoodieHiveClient(hiveSyncConfig, HiveTestUtil.getHiveConf(), fileSystem);
     List<String> writtenPartitionsSince = hiveClient.getPartitionsWrittenToSince(Option.of(instantTime));
     assertEquals(1, writtenPartitionsSince.size(), "We should have one partition written after 100 commit");
-    List<Partition> hivePartitions = hiveClient.scanTablePartitions(hiveSyncConfig.tableName);
-    List<PartitionEvent> partitionEvents = hiveClient.getPartitionEvents(hivePartitions, writtenPartitionsSince);
+    List<PartitionEvent> partitionEvents = hiveClient.getPartitionEvents(hiveSyncConfig.tableName, writtenPartitionsSince);
     assertEquals(1, partitionEvents.size(), "There should be only one partition event");
     assertEquals(PartitionEventType.ADD, partitionEvents.iterator().next().eventType, "The one partition event must of type ADD");
 

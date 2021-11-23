@@ -351,31 +351,38 @@ public class HoodieGlueClient extends AbstractSyncHoodieClient {
     }
   }
 
+  /**
+   * Iterate over the storage partitions and find if there are any new partitions that need to be added or updated.
+   * Generate a list of PartitionEvent based on the changes required.
+   */
   @Override
-  public boolean syncPartitions(String tableName, List<String> writtenPartitionsSince) {
-    boolean partitionsChanged;
-    try {
-      List<Partition> hivePartitions = scanTablePartitions(syncConfig.databaseName, tableName);
-      List<AbstractSyncHoodieClient.PartitionEvent> partitionEvents =
-          getPartitionEvents(hivePartitions, writtenPartitionsSince);
-      List<String> newPartitions = filterPartitions(partitionEvents, AbstractSyncHoodieClient.PartitionEvent.PartitionEventType.ADD);
-      LOG.info("New Partitions " + newPartitions);
-      addPartitionsToTable(tableName, newPartitions);
-      List<String> updatePartitions = filterPartitions(partitionEvents, AbstractSyncHoodieClient.PartitionEvent.PartitionEventType.UPDATE);
-      LOG.info("Changed Partitions " + updatePartitions);
-      updatePartitionsToTable(tableName, updatePartitions);
-      partitionsChanged = !updatePartitions.isEmpty() || !newPartitions.isEmpty();
-    } catch (Exception e) {
-      throw new HoodieHiveSyncException("Failed to sync partitions for table " + tableName
-          + " in database " + syncConfig.databaseName, e);
+  public List<AbstractSyncHoodieClient.PartitionEvent> getPartitionEvents(String tableName, List<String> partitionStoragePartitions) {
+    List<Partition> tablePartitions = scanTablePartitions(syncConfig.databaseName, tableName);
+
+    Map<String, String> paths = new HashMap<>();
+    for (Partition tablePartition : tablePartitions) {
+      List<String> hivePartitionValues = tablePartition.getValues();
+      String fullTablePartitionPath =
+          Path.getPathWithoutSchemeAndAuthority(new Path(tablePartition.getStorageDescriptor().getLocation())).toUri().getPath();
+      paths.put(String.join(", ", hivePartitionValues), fullTablePartitionPath);
     }
 
-    return partitionsChanged;
-  }
-
-  private List<String> filterPartitions(List<AbstractSyncHoodieClient.PartitionEvent> events, AbstractSyncHoodieClient.PartitionEvent.PartitionEventType eventType) {
-    return events.stream().filter(s -> s.eventType == eventType).map(s -> s.storagePartition)
-        .collect(Collectors.toList());
+    List<PartitionEvent> events = new ArrayList<>();
+    for (String storagePartition : partitionStoragePartitions) {
+      Path storagePartitionPath = FSUtils.getPartitionPath(syncConfig.basePath, storagePartition);
+      String fullStoragePartitionPath = Path.getPathWithoutSchemeAndAuthority(storagePartitionPath).toUri().getPath();
+      // Check if the partition values or if hdfs path is the same
+      List<String> storagePartitionValues = partitionValueExtractor.extractPartitionValuesInPath(storagePartition);
+      if (!storagePartitionValues.isEmpty()) {
+        String storageValue = String.join(", ", storagePartitionValues);
+        if (!paths.containsKey(storageValue)) {
+          events.add(PartitionEvent.newPartitionAddEvent(storagePartition));
+        } else if (!paths.get(storageValue).equals(fullStoragePartitionPath)) {
+          events.add(PartitionEvent.newPartitionUpdateEvent(storagePartition));
+        }
+      }
+    }
+    return events;
   }
 
   /**
@@ -438,37 +445,6 @@ public class HoodieGlueClient extends AbstractSyncHoodieClient {
       throw new HoodieHiveSyncException("Fatal error while scanning all table partitions for table "
           + tableName + " in database " + databaseName, exception);
     }
-  }
-
-  /**
-   * Iterate over the storage partitions and find if there are any new partitions that need to be added or updated.
-   * Generate a list of PartitionEvent based on the changes required.
-   */
-  private List<PartitionEvent> getPartitionEvents(List<Partition> tablePartitions, List<String> partitionStoragePartitions) {
-    Map<String, String> paths = new HashMap<>();
-    for (Partition tablePartition : tablePartitions) {
-      List<String> hivePartitionValues = tablePartition.getValues();
-      String fullTablePartitionPath =
-          Path.getPathWithoutSchemeAndAuthority(new Path(tablePartition.getStorageDescriptor().getLocation())).toUri().getPath();
-      paths.put(String.join(", ", hivePartitionValues), fullTablePartitionPath);
-    }
-
-    List<PartitionEvent> events = new ArrayList<>();
-    for (String storagePartition : partitionStoragePartitions) {
-      Path storagePartitionPath = FSUtils.getPartitionPath(syncConfig.basePath, storagePartition);
-      String fullStoragePartitionPath = Path.getPathWithoutSchemeAndAuthority(storagePartitionPath).toUri().getPath();
-      // Check if the partition values or if hdfs path is the same
-      List<String> storagePartitionValues = partitionValueExtractor.extractPartitionValuesInPath(storagePartition);
-      if (!storagePartitionValues.isEmpty()) {
-        String storageValue = String.join(", ", storagePartitionValues);
-        if (!paths.containsKey(storageValue)) {
-          events.add(PartitionEvent.newPartitionAddEvent(storagePartition));
-        } else if (!paths.get(storageValue).equals(fullStoragePartitionPath)) {
-          events.add(PartitionEvent.newPartitionUpdateEvent(storagePartition));
-        }
-      }
-    }
-    return events;
   }
 
   private StorageDescriptor getSd(String databaseName, String tableName) {

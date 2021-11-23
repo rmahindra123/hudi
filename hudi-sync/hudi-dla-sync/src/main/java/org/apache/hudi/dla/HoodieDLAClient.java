@@ -284,11 +284,6 @@ public class HoodieDLAClient extends AbstractSyncHoodieClient {
   }
 
   @Override
-  public void updateTableDefinition(String tableName, MessageType newSchema) {
-
-  }
-
-  @Override
   public boolean syncPartitions(String tableName, List<String> writtenPartitionsSince) {
     throw new IllegalStateException("This method is not implemented for this class!!");
   }
@@ -365,6 +360,11 @@ public class HoodieDLAClient extends AbstractSyncHoodieClient {
       }
     }
     return events;
+  }
+
+  @Override
+  public void updateTableDefinition(String tableName, MessageType newSchema) {
+    throw new IllegalStateException("This method is not implemented for this class!!");
   }
 
   public void updateTableDefinition(String tableName, SchemaDifference schemaDiff) {

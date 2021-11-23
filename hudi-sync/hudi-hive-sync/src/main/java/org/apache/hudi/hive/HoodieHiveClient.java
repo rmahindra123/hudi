@@ -29,6 +29,7 @@ import org.apache.hudi.hive.ddl.HMSDDLExecutor;
 import org.apache.hudi.hive.ddl.HiveQueryDDLExecutor;
 import org.apache.hudi.hive.ddl.HiveSyncMode;
 import org.apache.hudi.hive.ddl.JDBCExecutor;
+
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -46,7 +47,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.apache.hudi.hadoop.utils.HoodieHiveUtils.GLOBALLY_CONSISTENT_READ_TIMESTAMP;
 
@@ -62,7 +62,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
   private final HiveSyncConfig syncConfig;
 
   public HoodieHiveClient(HiveSyncConfig cfg, HiveConf configuration, FileSystem fs) {
-    super(cfg.basePath, cfg.assumeDatePartitioning, cfg.useFileListingFromMetadata,  cfg.withOperationField, fs);
+    super(cfg.basePath, cfg.assumeDatePartitioning, cfg.useFileListingFromMetadata, cfg.withOperationField, fs);
     this.syncConfig = cfg;
 
     // Support JDBC, HiveQL and metastore based implementations for backwards compatibility. Future users should
@@ -146,55 +146,38 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
    * Iterate over the storage partitions and find if there are any new partitions that need to be added or updated.
    * Generate a list of PartitionEvent based on the changes required.
    */
-  List<PartitionEvent> getPartitionEvents(List<Partition> tablePartitions, List<String> partitionStoragePartitions) {
-    Map<String, String> paths = new HashMap<>();
-    for (Partition tablePartition : tablePartitions) {
-      List<String> hivePartitionValues = tablePartition.getValues();
-      String fullTablePartitionPath =
-          Path.getPathWithoutSchemeAndAuthority(new Path(tablePartition.getSd().getLocation())).toUri().getPath();
-      paths.put(String.join(", ", hivePartitionValues), fullTablePartitionPath);
-    }
+  @Override
+  public List<AbstractSyncHoodieClient.PartitionEvent> getPartitionEvents(String tableName, List<String> partitionStoragePartitions) {
+    try {
+      List<Partition> tablePartitions = scanTablePartitions(tableName);
 
-    List<PartitionEvent> events = new ArrayList<>();
-    for (String storagePartition : partitionStoragePartitions) {
-      Path storagePartitionPath = FSUtils.getPartitionPath(syncConfig.basePath, storagePartition);
-      String fullStoragePartitionPath = Path.getPathWithoutSchemeAndAuthority(storagePartitionPath).toUri().getPath();
-      // Check if the partition values or if hdfs path is the same
-      List<String> storagePartitionValues = partitionValueExtractor.extractPartitionValuesInPath(storagePartition);
-      if (!storagePartitionValues.isEmpty()) {
-        String storageValue = String.join(", ", storagePartitionValues);
-        if (!paths.containsKey(storageValue)) {
-          events.add(PartitionEvent.newPartitionAddEvent(storagePartition));
-        } else if (!paths.get(storageValue).equals(fullStoragePartitionPath)) {
-          events.add(PartitionEvent.newPartitionUpdateEvent(storagePartition));
+      Map<String, String> paths = new HashMap<>();
+      for (Partition tablePartition : tablePartitions) {
+        List<String> hivePartitionValues = tablePartition.getValues();
+        String fullTablePartitionPath =
+            Path.getPathWithoutSchemeAndAuthority(new Path(tablePartition.getSd().getLocation())).toUri().getPath();
+        paths.put(String.join(", ", hivePartitionValues), fullTablePartitionPath);
+      }
+
+      List<PartitionEvent> events = new ArrayList<>();
+      for (String storagePartition : partitionStoragePartitions) {
+        Path storagePartitionPath = FSUtils.getPartitionPath(syncConfig.basePath, storagePartition);
+        String fullStoragePartitionPath = Path.getPathWithoutSchemeAndAuthority(storagePartitionPath).toUri().getPath();
+        // Check if the partition values or if hdfs path is the same
+        List<String> storagePartitionValues = partitionValueExtractor.extractPartitionValuesInPath(storagePartition);
+        if (!storagePartitionValues.isEmpty()) {
+          String storageValue = String.join(", ", storagePartitionValues);
+          if (!paths.containsKey(storageValue)) {
+            events.add(PartitionEvent.newPartitionAddEvent(storagePartition));
+          } else if (!paths.get(storageValue).equals(fullStoragePartitionPath)) {
+            events.add(PartitionEvent.newPartitionUpdateEvent(storagePartition));
+          }
         }
       }
-    }
-    return events;
-  }
-
-  /**
-   * Syncs the list of storage partitions passed in (checks if the partition is in hive, if not adds it or if the
-   * partition path does not match, it updates the partition path).
-   */
-  @Override
-  public boolean syncPartitions(String tableName, List<String> writtenPartitionsSince) {
-    boolean partitionsChanged;
-    try {
-      List<Partition> hivePartitions = scanTablePartitions(tableName);
-      List<PartitionEvent> partitionEvents =
-          getPartitionEvents(hivePartitions, writtenPartitionsSince);
-      List<String> newPartitions = filterPartitions(partitionEvents, PartitionEvent.PartitionEventType.ADD);
-      LOG.info("New Partitions " + newPartitions);
-      addPartitionsToTable(tableName, newPartitions);
-      List<String> updatePartitions = filterPartitions(partitionEvents, PartitionEvent.PartitionEventType.UPDATE);
-      LOG.info("Changed Partitions " + updatePartitions);
-      updatePartitionsToTable(tableName, updatePartitions);
-      partitionsChanged = !updatePartitions.isEmpty() || !newPartitions.isEmpty();
+      return events;
     } catch (Exception e) {
       throw new HoodieHiveSyncException("Failed to sync partitions for table " + tableName, e);
     }
-    return partitionsChanged;
   }
 
   @Override
@@ -277,7 +260,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
 
   public void updateLastReplicatedTimeStamp(String tableName, String timeStamp) {
     if (!activeTimeline.filterCompletedInstants().getInstants()
-            .anyMatch(i -> i.getTimestamp().equals(timeStamp))) {
+        .anyMatch(i -> i.getTimestamp().equals(timeStamp))) {
       throw new HoodieHiveSyncException(
           "Not a valid completed timestamp " + timeStamp + " for table " + tableName);
     }
@@ -340,12 +323,7 @@ public class HoodieHiveClient extends AbstractSyncHoodieClient {
   /**
    * Scan table partitions.
    */
-  private List<Partition> scanTablePartitions(String tableName) throws TException {
+  List<Partition> scanTablePartitions(String tableName) throws TException {
     return client.listPartitions(syncConfig.databaseName, tableName, (short) -1);
-  }
-
-  private List<String> filterPartitions(List<PartitionEvent> events, PartitionEvent.PartitionEventType eventType) {
-    return events.stream().filter(s -> s.eventType == eventType).map(s -> s.storagePartition)
-        .collect(Collectors.toList());
   }
 }
