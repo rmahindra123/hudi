@@ -104,6 +104,7 @@
                   <include>com.amazonaws:dynamodb-lock-client</include>
                   <include>com.amazonaws:aws-java-sdk-dynamodb</include>
                   <include>com.amazonaws:aws-java-sdk-core</include>
+                  <include>com.amazonaws:aws-java-sdk-glue</include>
 
                   <include>org.apache.spark:spark-avro_${scala.binary.version}</include>
                   <include>org.apache.hive:hive-common</include>

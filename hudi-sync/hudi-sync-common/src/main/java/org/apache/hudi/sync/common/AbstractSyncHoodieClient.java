@@ -41,7 +41,6 @@ import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 public abstract class AbstractSyncHoodieClient {
 
@@ -75,14 +74,6 @@ public abstract class AbstractSyncHoodieClient {
     this.fs = fs;
   }
 
-  public abstract void createDatabase(String databaseName);
-
-  /**
-   * @param databaseName
-   * @return true if the configured database exists
-   */
-  public abstract boolean doesDataBaseExist(String databaseName);
-
   /**
    * Create the table.
    * @param tableName The table name.
@@ -103,10 +94,6 @@ public abstract class AbstractSyncHoodieClient {
   public abstract Option<String> getLastCommitTimeSynced(String tableName);
 
   public abstract void updateLastCommitTimeSynced(String tableName);
-
-  public abstract void updateTableDefinition(String tableName, MessageType newSchema);
-
-  public abstract List<AbstractSyncHoodieClient.PartitionEvent> getPartitionEvents(String tableName, List<String> writtenPartitionsSince);
 
   public abstract void addPartitionsToTable(String tableName, List<String> partitionsToAdd);
 
@@ -171,26 +158,6 @@ public abstract class AbstractSyncHoodieClient {
     }
   }
 
-  public boolean syncPartitions(String tableName, List<String> writtenPartitionsSince) {
-    boolean partitionsChanged;
-    try {
-      List<AbstractSyncHoodieClient.PartitionEvent> partitionEvents =
-          getPartitionEvents(tableName, writtenPartitionsSince);
-      List<String> newPartitions = filterPartitions(partitionEvents, AbstractSyncHoodieClient.PartitionEvent.PartitionEventType.ADD);
-      LOG.info("New Partitions " + newPartitions);
-      addPartitionsToTable(tableName, newPartitions);
-      List<String> updatePartitions = filterPartitions(partitionEvents, AbstractSyncHoodieClient.PartitionEvent.PartitionEventType.UPDATE);
-      LOG.info("Changed Partitions " + updatePartitions);
-      updatePartitionsToTable(tableName, updatePartitions);
-      partitionsChanged = !updatePartitions.isEmpty() || !newPartitions.isEmpty();
-    } catch (Exception e) {
-      throw new HoodieSyncException("Failed to sync partitions for table " + tableName
-          + " in basepath " + basePath, e);
-    }
-
-    return partitionsChanged;
-  }
-  
   @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
   public List<String> getPartitionsWrittenToSince(Option<String> lastCommitTimeSynced) {
     if (!lastCommitTimeSynced.isPresent()) {
@@ -252,11 +219,6 @@ public abstract class AbstractSyncHoodieClient {
       return new TableSchemaResolver(this.metaClient).readSchemaFromLastCompaction(lastCompactionCommitOpt);
     }
     return messageType;
-  }
-
-  private List<String> filterPartitions(List<AbstractSyncHoodieClient.PartitionEvent> events, AbstractSyncHoodieClient.PartitionEvent.PartitionEventType eventType) {
-    return events.stream().filter(s -> s.eventType == eventType).map(s -> s.storagePartition)
-        .collect(Collectors.toList());
   }
 
   /**

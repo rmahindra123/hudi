@@ -50,7 +50,7 @@ import java.util.Map;
 
 import static org.apache.hudi.hadoop.utils.HoodieHiveUtils.GLOBALLY_CONSISTENT_READ_TIMESTAMP;
 
-public class HoodieHiveClient extends AbstractSyncHoodieClient {
+public class HoodieHiveClient extends AbstractHiveSyncHoodieClient {
 
   private static final String HIVE_ESCAPE_CHARACTER = HiveSchemaUtil.HIVE_ESCAPE_CHARACTER;
 

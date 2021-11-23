@@ -21,6 +21,7 @@ package org.apache.hudi.hive.util;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.hive.AbstractHiveSyncHoodieClient;
 import org.apache.hudi.hive.HiveSyncConfig;
 import org.apache.hudi.hive.HoodieHiveSyncException;
 import org.apache.hudi.hive.PartitionValueExtractor;
@@ -73,7 +74,7 @@ import java.util.stream.Collectors;
  * Currently Experimental. This class implements the logic to sync meta with the AWS Glue (managed Hive) server
  * to enable querying via Glue ETLs, Athena etc.
  */
-public class HoodieGlueClient extends AbstractSyncHoodieClient {
+public class HoodieGlueClient extends AbstractHiveSyncHoodieClient {
 
   private static final Logger LOG = LogManager.getLogger(HoodieGlueClient.class);
   private final HoodieTimeline activeTimeline;

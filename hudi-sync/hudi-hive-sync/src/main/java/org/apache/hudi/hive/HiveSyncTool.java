@@ -30,7 +30,6 @@ import org.apache.hudi.hive.util.HiveSchemaUtil;
 import org.apache.hudi.hive.util.HoodieGlueClient;
 import org.apache.hudi.hive.util.Parquet2SparkSchemaUtils;
 
-import org.apache.hudi.sync.common.AbstractSyncHoodieClient;
 import org.apache.hudi.sync.common.AbstractSyncTool;
 
 import com.beust.jcommander.JCommander;
@@ -67,7 +66,7 @@ public class HiveSyncTool extends AbstractSyncTool {
   public static final String SUFFIX_READ_OPTIMIZED_TABLE = "_ro";
 
   protected final HiveSyncConfig cfg;
-  protected AbstractSyncHoodieClient hiveClient = null;
+  protected AbstractHiveSyncHoodieClient hiveClient = null;
   protected String snapshotTableName = null;
   protected Option<String> roTableName = null;
 
