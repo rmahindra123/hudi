@@ -181,7 +181,7 @@ public class HoodieHiveClient extends AbstractHiveSyncHoodieClient {
   }
 
   @Override
-  public void updateTableDefinition(String tableName, MessageType newSchema) {
+  public void updateSchema(String tableName, MessageType newSchema) {
     ddlExecutor.updateTableDefinition(tableName, newSchema);
   }
 
@@ -217,21 +217,21 @@ public class HoodieHiveClient extends AbstractHiveSyncHoodieClient {
   }
 
   @Override
-  public boolean doesDataBaseExist(String databaseName) {
+  public boolean databaseExists() {
     try {
-      client.getDatabase(databaseName);
+      client.getDatabase(syncConfig.databaseName);
       return true;
     } catch (NoSuchObjectException noSuchObjectException) {
       // NoSuchObjectException is thrown when there is no existing database of the name.
       return false;
     } catch (TException e) {
-      throw new HoodieHiveSyncException("Failed to check if database exists " + databaseName, e);
+      throw new HoodieHiveSyncException("Failed to check if database exists " + syncConfig.databaseName, e);
     }
   }
 
   @Override
-  public void createDatabase(String databaseName) {
-    ddlExecutor.createDatabase(databaseName);
+  public void createDatabase() {
+    ddlExecutor.createDatabase();
   }
 
   @Override
@@ -301,10 +301,6 @@ public class HoodieHiveClient extends AbstractHiveSyncHoodieClient {
     } catch (Exception e) {
       LOG.error("Could not close connection ", e);
     }
-  }
-
-  List<String> getAllTables(String db) throws Exception {
-    return client.getAllTables(db);
   }
 
   @Override

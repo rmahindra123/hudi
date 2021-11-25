@@ -21,6 +21,7 @@ package org.apache.hudi.hive.replication;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieTableType;
 import org.apache.hudi.common.util.Option;
+import org.apache.hudi.common.util.ValidationUtils;
 import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.hive.HoodieHiveClient;
 
@@ -41,11 +42,8 @@ public class GlobalHiveSyncTool extends HiveSyncTool {
 
   public GlobalHiveSyncTool(GlobalHiveSyncConfig cfg, HiveConf configuration, FileSystem fs) {
     super(cfg, configuration, fs);
-    if (!(hiveClient instanceof HoodieHiveClient)) {
-      hoodieHiveClient = null;
-      throw new IllegalArgumentException("GlobalHiveSyncTool only support Hive Sync. For Glue meta sync, use HiveSyncTool with the same config");
-    }
-    hoodieHiveClient = (HoodieHiveClient) hiveClient;
+    ValidationUtils.checkArgument((syncClient instanceof HoodieHiveClient), "GlobalHiveSyncTool only support Hive Sync. For Glue meta sync, use HiveSyncTool with the same config");
+    hoodieHiveClient = (HoodieHiveClient) syncClient;
   }
 
   @Override

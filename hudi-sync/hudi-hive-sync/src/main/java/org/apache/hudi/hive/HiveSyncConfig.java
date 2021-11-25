@@ -63,8 +63,8 @@ public class HiveSyncConfig implements Serializable {
       + " exists to support backward compatibility. If you use hoodie 0.3.x, do not set this parameter")
   public Boolean assumeDatePartitioning = false;
 
-  @Parameter(names = "--use-aws-glue-meta", description = "If enabled, the hudi table will get synced with the AWS Glue Meta.")
-  public Boolean isAwsGlueMetaSyncEnabled = false;
+  @Parameter(names = "--use-aws-glue-data-catalog", description = "If enabled, the hudi table will get synced with the AWS Glue Data Catalog.")
+  public Boolean isAwsGlueDataCatalogSyncEnabled = false;
 
   @Parameter(names = {"--use-pre-apache-input-format"},
       description = "Use InputFormat under com.uber.hoodie package "
@@ -138,6 +138,7 @@ public class HiveSyncConfig implements Serializable {
     newConfig.partitionValueExtractorClass = cfg.partitionValueExtractorClass;
     newConfig.jdbcUrl = cfg.jdbcUrl;
     newConfig.tableName = cfg.tableName;
+    newConfig.isAwsGlueDataCatalogSyncEnabled = cfg.isAwsGlueDataCatalogSyncEnabled;
     newConfig.usePreApacheInputFormat = cfg.usePreApacheInputFormat;
     newConfig.useFileListingFromMetadata = cfg.useFileListingFromMetadata;
     newConfig.supportTimestamp = cfg.supportTimestamp;
@@ -156,32 +157,33 @@ public class HiveSyncConfig implements Serializable {
   @Override
   public String toString() {
     return "HiveSyncConfig{"
-      + "databaseName='" + databaseName + '\''
-      + ", tableName='" + tableName + '\''
-      + ", baseFileFormat='" + baseFileFormat + '\''
-      + ", hiveUser='" + hiveUser + '\''
-      + ", hivePass='" + hivePass + '\''
-      + ", jdbcUrl='" + jdbcUrl + '\''
-      + ", basePath='" + basePath + '\''
-      + ", partitionFields=" + partitionFields
-      + ", partitionValueExtractorClass='" + partitionValueExtractorClass + '\''
-      + ", assumeDatePartitioning=" + assumeDatePartitioning
-      + ", usePreApacheInputFormat=" + usePreApacheInputFormat
-      + ", useJdbc=" + useJdbc
-      + ", autoCreateDatabase=" + autoCreateDatabase
-      + ", ignoreExceptions=" + ignoreExceptions
-      + ", skipROSuffix=" + skipROSuffix
-      + ", useFileListingFromMetadata=" + useFileListingFromMetadata
-      + ", tableProperties='" + tableProperties + '\''
-      + ", serdeProperties='" + serdeProperties + '\''
-      + ", help=" + help
-      + ", supportTimestamp=" + supportTimestamp
-      + ", decodePartition=" + decodePartition
-      + ", createManagedTable=" + createManagedTable
-      + ", syncAsSparkDataSourceTable=" + syncAsSparkDataSourceTable
-      + ", sparkSchemaLengthThreshold=" + sparkSchemaLengthThreshold
-      + ", withOperationField=" + withOperationField
-      + ", isConditionalSync=" + isConditionalSync
-      + '}';
+        + "databaseName='" + databaseName + '\''
+        + ", tableName='" + tableName + '\''
+        + ", baseFileFormat='" + baseFileFormat + '\''
+        + ", hiveUser='" + hiveUser + '\''
+        + ", hivePass='" + hivePass + '\''
+        + ", jdbcUrl='" + jdbcUrl + '\''
+        + ", basePath='" + basePath + '\''
+        + ", partitionFields=" + partitionFields
+        + ", partitionValueExtractorClass='" + partitionValueExtractorClass + '\''
+        + ", assumeDatePartitioning=" + assumeDatePartitioning
+        + ", isAwsGlueDataCatalogSyncEnabled=" + isAwsGlueDataCatalogSyncEnabled
+        + ", usePreApacheInputFormat=" + usePreApacheInputFormat
+        + ", useJdbc=" + useJdbc
+        + ", autoCreateDatabase=" + autoCreateDatabase
+        + ", ignoreExceptions=" + ignoreExceptions
+        + ", skipROSuffix=" + skipROSuffix
+        + ", useFileListingFromMetadata=" + useFileListingFromMetadata
+        + ", tableProperties='" + tableProperties + '\''
+        + ", serdeProperties='" + serdeProperties + '\''
+        + ", help=" + help
+        + ", supportTimestamp=" + supportTimestamp
+        + ", decodePartition=" + decodePartition
+        + ", createManagedTable=" + createManagedTable
+        + ", syncAsSparkDataSourceTable=" + syncAsSparkDataSourceTable
+        + ", sparkSchemaLengthThreshold=" + sparkSchemaLengthThreshold
+        + ", withOperationField=" + withOperationField
+        + ", isConditionalSync=" + isConditionalSync
+        + '}';
   }
 }

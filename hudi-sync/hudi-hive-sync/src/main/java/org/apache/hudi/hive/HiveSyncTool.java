@@ -27,7 +27,6 @@ import org.apache.hudi.exception.InvalidTableException;
 import org.apache.hudi.hadoop.utils.HoodieInputFormatUtils;
 import org.apache.hudi.hive.util.ConfigUtils;
 import org.apache.hudi.hive.util.HiveSchemaUtil;
-import org.apache.hudi.hive.util.HoodieGlueClient;
 import org.apache.hudi.hive.util.Parquet2SparkSchemaUtils;
 
 import org.apache.hudi.sync.common.AbstractSyncTool;
@@ -66,7 +65,7 @@ public class HiveSyncTool extends AbstractSyncTool {
   public static final String SUFFIX_READ_OPTIMIZED_TABLE = "_ro";
 
   protected final HiveSyncConfig cfg;
-  protected AbstractHiveSyncHoodieClient hiveClient = null;
+  protected AbstractHiveSyncHoodieClient syncClient = null;
   protected String snapshotTableName = null;
   protected Option<String> roTableName = null;
 
@@ -74,11 +73,10 @@ public class HiveSyncTool extends AbstractSyncTool {
     super(configuration.getAllProperties(), fs);
 
     try {
-      if (cfg.isAwsGlueMetaSyncEnabled) {
-        LOG.info("Syncing Hudi Table with the AWS Glue Metastore");
-        this.hiveClient = new HoodieGlueClient(cfg, fs);
+      if (cfg.isAwsGlueDataCatalogSyncEnabled) {
+        this.syncClient = new GlueDataCatalogClient(cfg, fs);
       } else {
-        this.hiveClient = new HoodieHiveClient(cfg, configuration, fs);
+        this.syncClient = new HoodieHiveClient(cfg, configuration, fs);
       }
     } catch (RuntimeException e) {
       if (cfg.ignoreExceptions) {
@@ -94,8 +92,8 @@ public class HiveSyncTool extends AbstractSyncTool {
       LOG.warn("Set partitionFields to empty, since the NonPartitionedExtractor is used");
       cfg.partitionFields = new ArrayList<>();
     }
-    if (hiveClient != null) {
-      switch (hiveClient.getTableType()) {
+    if (syncClient != null) {
+      switch (syncClient.getTableType()) {
         case COPY_ON_WRITE:
           this.snapshotTableName = cfg.tableName;
           this.roTableName = Option.empty();
@@ -106,8 +104,8 @@ public class HiveSyncTool extends AbstractSyncTool {
               Option.of(cfg.tableName + SUFFIX_READ_OPTIMIZED_TABLE);
           break;
         default:
-          LOG.error("Unknown table type " + hiveClient.getTableType());
-          throw new InvalidTableException(hiveClient.getBasePath());
+          LOG.error("Unknown table type " + syncClient.getTableType());
+          throw new InvalidTableException(syncClient.getBasePath());
       }
     }
   }
@@ -115,20 +113,20 @@ public class HiveSyncTool extends AbstractSyncTool {
   @Override
   public void syncHoodieTable() {
     try {
-      if (hiveClient != null) {
+      if (syncClient != null) {
         doSync();
       }
     } catch (RuntimeException re) {
       throw new HoodieException("Got runtime exception when hive syncing " + cfg.tableName, re);
     } finally {
-      if (hiveClient != null) {
-        hiveClient.close();
+      if (syncClient != null) {
+        syncClient.close();
       }
     }
   }
 
   protected void doSync() {
-    switch (hiveClient.getTableType()) {
+    switch (syncClient.getTableType()) {
       case COPY_ON_WRITE:
         syncHoodieTable(snapshotTableName, false, false);
         break;
@@ -139,44 +137,44 @@ public class HiveSyncTool extends AbstractSyncTool {
         syncHoodieTable(snapshotTableName, true, false);
         break;
       default:
-        LOG.error("Unknown table type " + hiveClient.getTableType());
-        throw new InvalidTableException(hiveClient.getBasePath());
+        LOG.error("Unknown table type " + syncClient.getTableType());
+        throw new InvalidTableException(syncClient.getBasePath());
     }
   }
 
   protected void syncHoodieTable(String tableName, boolean useRealtimeInputFormat,
                                boolean readAsOptimized) {
-    LOG.info("Trying to sync hoodie table " + tableName + " with base path " + hiveClient.getBasePath()
-        + " of type " + hiveClient.getTableType());
+    LOG.info("Trying to sync hoodie table " + tableName + " with base path " + syncClient.getBasePath()
+        + " of type " + syncClient.getTableType() + " with destination " + syncClient.getClass().getName());
 
     // check if the database exists else create it
     if (cfg.autoCreateDatabase) {
       try {
-        if (!hiveClient.doesDataBaseExist(cfg.databaseName)) {
-          hiveClient.createDatabase(cfg.databaseName);
+        if (!syncClient.databaseExists()) {
+          syncClient.createDatabase();
         }
       } catch (Exception e) {
         // this is harmless since table creation will fail anyways, creation of DB is needed for in-memory testing
         LOG.warn("Unable to create database", e);
       }
     } else {
-      if (!hiveClient.doesDataBaseExist(cfg.databaseName)) {
+      if (!syncClient.databaseExists()) {
         throw new HoodieHiveSyncException("hive database does not exist " + cfg.databaseName);
       }
     }
 
     // Check if the necessary table exists
-    boolean tableExists = hiveClient.doesTableExist(tableName);
+    boolean tableExists = syncClient.doesTableExist(tableName);
 
     // Get the parquet schema for this table looking at the latest commit
-    MessageType schema = hiveClient.getDataSchema();
+    MessageType schema = syncClient.getDataSchema();
 
     // Currently HoodieBootstrapRelation does support reading bootstrap MOR rt table,
     // so we disable the syncAsSparkDataSourceTable here to avoid read such kind table
     // by the data source way (which will use the HoodieBootstrapRelation).
     // TODO after we support bootstrap MOR rt table in HoodieBootstrapRelation[HUDI-2071], we can remove this logical.
-    if (hiveClient.isBootstrap()
-            && hiveClient.getTableType() == HoodieTableType.MERGE_ON_READ
+    if (syncClient.isBootstrap()
+            && syncClient.getTableType() == HoodieTableType.MERGE_ON_READ
             && !readAsOptimized) {
       cfg.syncAsSparkDataSourceTable = false;
     }
@@ -187,17 +185,17 @@ public class HiveSyncTool extends AbstractSyncTool {
     // Get the last time we successfully synced partitions
     Option<String> lastCommitTimeSynced = Option.empty();
     if (tableExists) {
-      lastCommitTimeSynced = hiveClient.getLastCommitTimeSynced(tableName);
+      lastCommitTimeSynced = syncClient.getLastCommitTimeSynced(tableName);
     }
     LOG.info("Last commit time synced was found to be " + lastCommitTimeSynced.orElse("null"));
-    List<String> writtenPartitionsSince = hiveClient.getPartitionsWrittenToSince(lastCommitTimeSynced);
+    List<String> writtenPartitionsSince = syncClient.getPartitionsWrittenToSince(lastCommitTimeSynced);
     LOG.info("Storage partitions scan complete. Found " + writtenPartitionsSince.size());
 
     // Sync the partitions if needed
-    boolean partitionsChanged = hiveClient.syncPartitions(tableName, writtenPartitionsSince);
+    boolean partitionsChanged = syncClient.syncPartitions(tableName, writtenPartitionsSince);
     boolean meetSyncConditions = schemaChanged || partitionsChanged;
     if (!cfg.isConditionalSync || meetSyncConditions) {
-      hiveClient.updateLastCommitTimeSynced(tableName);
+      syncClient.updateLastCommitTimeSynced(tableName);
     }
     LOG.info("Sync complete for " + tableName);
   }
@@ -240,19 +238,19 @@ public class HiveSyncTool extends AbstractSyncTool {
       // Custom serde will not work with ALTER TABLE REPLACE COLUMNS
       // https://github.com/apache/hive/blob/release-1.1.0/ql/src/java/org/apache/hadoop/hive
       // /ql/exec/DDLTask.java#L3488
-      hiveClient.createTable(tableName, schema, inputFormatClassName,
+      syncClient.createTable(tableName, schema, inputFormatClassName,
           outputFormatClassName, serDeFormatClassName, serdeProperties, tableProperties);
       schemaChanged = true;
     } else {
       // Check if the table schema has evolved
-      Map<String, String> tableSchema = hiveClient.getTableSchema(tableName);
+      Map<String, String> tableSchema = syncClient.getTableSchema(tableName);
       SchemaDifference schemaDiff = HiveSchemaUtil.getSchemaDifference(schema, tableSchema, cfg.partitionFields, cfg.supportTimestamp);
       if (!schemaDiff.isEmpty()) {
         LOG.info("Schema difference found for " + tableName);
-        hiveClient.updateTableDefinition(tableName, schema);
+        syncClient.updateSchema(tableName, schema);
         // Sync the table properties if the schema has changed
         if (cfg.tableProperties != null) {
-          hiveClient.updateTableProperties(tableName, tableProperties);
+          syncClient.updateTableProperties(tableName, tableProperties);
           LOG.info("Sync table properties for " + tableName + ", table properties is: " + cfg.tableProperties);
         }
         schemaChanged = true;

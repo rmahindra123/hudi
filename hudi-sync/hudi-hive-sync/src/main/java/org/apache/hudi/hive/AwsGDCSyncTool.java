@@ -16,11 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.hudi.hive.util;
+package org.apache.hudi.hive;
 
 import org.apache.hudi.common.fs.FSUtils;
-import org.apache.hudi.hive.HiveSyncConfig;
-import org.apache.hudi.hive.HiveSyncTool;
 
 import com.beust.jcommander.JCommander;
 import org.apache.hadoop.conf.Configuration;
@@ -28,17 +26,18 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.hive.conf.HiveConf;
 
 /**
- * Utility class to sync a hudi table (meta) with the AWS Glue Metastore,
- * which enables querying the Hudi tables using AWS Athena, Glue ETLs.
+ * Currently Experimental. Utility class that implements syncing a Hudi Table with the
+ * AWS Glue Data Catalog (https://docs.aws.amazon.com/glue/latest/dg/populate-data-catalog.html)
+ * to enable querying via Glue ETLs, Athena etc.
  *
  * Extends HiveSyncTool since most logic is similar to Hive syncing,
- * expect using a different client {@link HoodieGlueClient} that implements
+ * expect using a different client {@link GlueDataCatalogClient} that implements
  * the necessary functionality using Glue APIs.
  */
-public class GlueSyncTool extends HiveSyncTool {
+public class AwsGDCSyncTool extends HiveSyncTool {
 
-  public GlueSyncTool(HiveSyncConfig cfg, HiveConf configuration, FileSystem fs) {
-    super(enableGlueSync(cfg), configuration, fs);
+  public AwsGDCSyncTool(HiveSyncConfig cfg, FileSystem fs) {
+    super(enableGlueSync(cfg), new HiveConf(), fs);
   }
 
   @Override
@@ -46,9 +45,9 @@ public class GlueSyncTool extends HiveSyncTool {
     super.syncHoodieTable();
   }
 
-  private static HiveSyncConfig enableGlueSync(HiveSyncConfig cfg) {
-    cfg.isAwsGlueMetaSyncEnabled = true;
-    return cfg;
+  private static HiveSyncConfig enableGlueSync(HiveSyncConfig hiveSyncConfig) {
+    hiveSyncConfig.isAwsGlueDataCatalogSyncEnabled = true;
+    return hiveSyncConfig;
   }
 
   public static void main(String[] args) {
@@ -62,6 +61,6 @@ public class GlueSyncTool extends HiveSyncTool {
     FileSystem fs = FSUtils.getFs(cfg.basePath, new Configuration());
     // HiveConf is unused, but passed to maintain constructor structure
     // as deltastreamer uses reflection.
-    new GlueSyncTool(cfg, new HiveConf(), fs).syncHoodieTable();
+    new AwsGDCSyncTool(cfg, fs).syncHoodieTable();
   }
 }

@@ -16,15 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hudi.hive.util;
+package org.apache.hudi.hive;
 
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
-import org.apache.hudi.hive.AbstractHiveSyncHoodieClient;
-import org.apache.hudi.hive.HiveSyncConfig;
-import org.apache.hudi.hive.HoodieHiveSyncException;
-import org.apache.hudi.hive.PartitionValueExtractor;
+import org.apache.hudi.hive.util.HiveSchemaUtil;
 import org.apache.hudi.sync.common.AbstractSyncHoodieClient;
 
 import com.amazonaws.services.glue.AWSGlue;
@@ -71,18 +68,18 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Currently Experimental. This class implements the logic to sync meta with the AWS Glue (managed Hive) server
- * to enable querying via Glue ETLs, Athena etc.
+ * This class implements all the AWS APIs to enable syncing of a Hudi Table with the
+ * AWS Glue Data Catalog (https://docs.aws.amazon.com/glue/latest/dg/populate-data-catalog.html).
  */
-public class HoodieGlueClient extends AbstractHiveSyncHoodieClient {
+public class GlueDataCatalogClient extends AbstractHiveSyncHoodieClient {
 
-  private static final Logger LOG = LogManager.getLogger(HoodieGlueClient.class);
+  private static final Logger LOG = LogManager.getLogger(GlueDataCatalogClient.class);
   private final HoodieTimeline activeTimeline;
   private final AWSGlue awsGlueClient;
   private final HiveSyncConfig syncConfig;
   private final PartitionValueExtractor partitionValueExtractor;
 
-  public HoodieGlueClient(HiveSyncConfig cfg, FileSystem fs) {
+  public GlueDataCatalogClient(HiveSyncConfig cfg, FileSystem fs) {
     super(cfg.basePath, cfg.assumeDatePartitioning, cfg.useFileListingFromMetadata, cfg.withOperationField, fs);
     this.awsGlueClient = getGlueClient();
     this.syncConfig = cfg;
@@ -97,34 +94,33 @@ public class HoodieGlueClient extends AbstractHiveSyncHoodieClient {
   }
 
   @Override
-  public boolean doesDataBaseExist(String databaseName) {
+  public boolean databaseExists() {
     GetDatabaseRequest request = new GetDatabaseRequest();
-    request.setName(databaseName);
+    request.setName(syncConfig.databaseName);
     try {
       return (awsGlueClient.getDatabase(request).getDatabase() != null);
     } catch (EntityNotFoundException exception) {
-      LOG.error("Database " + databaseName, exception);
+      LOG.error("Database " + syncConfig.databaseName, exception);
     } catch (Exception exception) {
-      LOG.error("Failed to check if database exists " + databaseName, exception);
-      throw new HoodieHiveSyncException("Failed to check if database exists " + databaseName
-          + " in region ", exception);
+      LOG.error("Failed to check if database exists " + syncConfig.databaseName, exception);
+      throw new HoodieHiveSyncException("Failed to check if database exists " + syncConfig.databaseName + " in region ", exception);
     }
     return false;
   }
 
   @Override
-  public void createDatabase(String databaseName) {
-    if (!doesDataBaseExist(databaseName)) {
+  public void createDatabase() {
+    if (!databaseExists()) {
       CreateDatabaseRequest request = new CreateDatabaseRequest();
-      request.setDatabaseInput(new DatabaseInput().withName(databaseName).withDescription("automatically created by hudi").withParameters(null).withLocationUri(null));
+      request.setDatabaseInput(new DatabaseInput().withName(syncConfig.databaseName).withDescription("automatically created by hudi").withParameters(null).withLocationUri(null));
       try {
         CreateDatabaseResult result = awsGlueClient.createDatabase(request);
         LOG.info("Successfully created database in Glue: " + result.toString());
       } catch (AlreadyExistsException exception) {
-        LOG.warn("Database " + databaseName + " already exists", exception);
+        LOG.warn("Database " + syncConfig.databaseName + " already exists", exception);
       } catch (Exception exception) {
-        LOG.error("Failed to create database " + databaseName, exception);
-        throw new HoodieHiveSyncException("Failed to create database " + databaseName, exception);
+        LOG.error("Failed to create database " + syncConfig.databaseName, exception);
+        throw new HoodieHiveSyncException("Failed to create database " + syncConfig.databaseName, exception);
       }
     }
   }
@@ -318,7 +314,7 @@ public class HoodieGlueClient extends AbstractHiveSyncHoodieClient {
   }
 
   @Override
-  public void updateTableDefinition(String tableName, MessageType newSchema) {
+  public void updateSchema(String tableName, MessageType newSchema) {
     // ToDo Cascade is set in Hive meta sync, but need to investigate how to configure it for Glue meta
     boolean cascade = syncConfig.partitionFields.size() > 0;
     try {

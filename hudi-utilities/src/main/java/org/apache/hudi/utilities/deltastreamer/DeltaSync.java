@@ -51,6 +51,7 @@ import org.apache.hudi.config.HoodiePayloadConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieIOException;
+import org.apache.hudi.hive.AwsGDCSyncTool;
 import org.apache.hudi.hive.HiveSyncConfig;
 import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.keygen.KeyGenerator;
@@ -620,6 +621,9 @@ public class DeltaSync implements Serializable {
           case "org.apache.hudi.hive.HiveSyncTool":
             syncHive();
             break;
+          case "org.apache.hudi.hive.AwsGDCSyncTool":
+            syncGlue();
+            break;
           default:
             FileSystem fs = FSUtils.getFs(cfg.targetBasePath, jssc.hadoopConfiguration());
             Properties properties = new Properties();
@@ -636,7 +640,7 @@ public class DeltaSync implements Serializable {
   }
 
   public void syncHive() {
-    HiveSyncConfig hiveSyncConfig = DataSourceUtils.buildHiveSyncConfig(props, cfg.targetBasePath, cfg.baseFileFormat);
+    HiveSyncConfig hiveSyncConfig = configureHiveSync();
     LOG.info("Syncing target hoodie table with hive table(" + hiveSyncConfig.tableName + "). Hive metastore URL :"
         + hiveSyncConfig.jdbcUrl + ", basePath :" + cfg.targetBasePath);
     HiveConf hiveConf = new HiveConf(conf, HiveConf.class);
@@ -648,6 +652,18 @@ public class DeltaSync implements Serializable {
   public void syncHive(HiveConf conf) {
     this.conf = conf;
     syncHive();
+  }
+
+  private void syncGlue() {
+    HiveSyncConfig hiveSyncConfig = configureHiveSync();
+    LOG.info("Syncing target hoodie table with aws glue db=" + hiveSyncConfig.databaseName
+        + " table=" + hiveSyncConfig.tableName
+        + ", basePath :" + cfg.targetBasePath);
+    new AwsGDCSyncTool(hiveSyncConfig, fs).syncHoodieTable();
+  }
+
+  private HiveSyncConfig configureHiveSync() {
+    return DataSourceUtils.buildHiveSyncConfig(props, cfg.targetBasePath, cfg.baseFileFormat);
   }
 
   /**

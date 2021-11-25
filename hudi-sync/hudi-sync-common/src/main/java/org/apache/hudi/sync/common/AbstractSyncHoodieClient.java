@@ -42,7 +42,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public abstract class AbstractSyncHoodieClient {
+public abstract class AbstractSyncHoodieClient implements AutoCloseable {
 
   private static final Logger LOG = LogManager.getLogger(AbstractSyncHoodieClient.class);
 
@@ -98,8 +98,6 @@ public abstract class AbstractSyncHoodieClient {
   public abstract void addPartitionsToTable(String tableName, List<String> partitionsToAdd);
 
   public abstract void updatePartitionsToTable(String tableName, List<String> changedPartitions);
-
-  public abstract void close();
 
   public  void updateTableProperties(String tableName, Map<String, String> tableProperties) {}
 
@@ -169,6 +167,13 @@ public abstract class AbstractSyncHoodieClient {
       return TimelineUtils.getPartitionsWritten(metaClient.getActiveTimeline().getCommitsTimeline()
           .findInstantsAfter(lastCommitTimeSynced.get(), Integer.MAX_VALUE));
     }
+  }
+
+  /**
+   * Releases any resources used by the client.
+   */
+  @Override
+  public void close() {
   }
 
   public abstract static class TypeConverter implements Serializable {

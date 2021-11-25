@@ -209,7 +209,7 @@ public class TestHiveSyncTool {
     assertDoesNotThrow(() -> {
       new HiveSyncTool(hiveSyncConfig, HiveTestUtil.getHiveConf(), fileSystem).syncHoodieTable();
     });
-    assertTrue(hiveClient.doesDataBaseExist(hiveSyncConfig.databaseName),
+    assertTrue(hiveClient.databaseExists(),
         "DataBases " + hiveSyncConfig.databaseName + " should exist after sync completes");
 
     // while autoCreateDatabase is false and database exists;
@@ -217,7 +217,7 @@ public class TestHiveSyncTool {
     assertDoesNotThrow(() -> {
       new HiveSyncTool(hiveSyncConfig, HiveTestUtil.getHiveConf(), fileSystem).syncHoodieTable();
     });
-    assertTrue(hiveClient.doesDataBaseExist(hiveSyncConfig.databaseName),
+    assertTrue(hiveClient.databaseExists(),
         "DataBases " + hiveSyncConfig.databaseName + " should exist after sync completes");
 
     // while autoCreateDatabase is true and database exists;
@@ -225,7 +225,7 @@ public class TestHiveSyncTool {
     assertDoesNotThrow(() -> {
       new HiveSyncTool(hiveSyncConfig, HiveTestUtil.getHiveConf(), fileSystem).syncHoodieTable();
     });
-    assertTrue(hiveClient.doesDataBaseExist(hiveSyncConfig.databaseName),
+    assertTrue(hiveClient.databaseExists(),
         "DataBases " + hiveSyncConfig.databaseName + " should exist after sync completes");
   }
 

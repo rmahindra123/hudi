@@ -45,15 +45,14 @@ public abstract class AbstractHiveSyncHoodieClient extends AbstractSyncHoodieCli
     super(basePath, assumeDatePartitioning, useFileListingFromMetadata, withOperationField, fs);
   }
 
-  public abstract void createDatabase(String databaseName);
+  public abstract void createDatabase();
 
   /**
-   * @param databaseName
    * @return true if the configured database exists
    */
-  public abstract boolean doesDataBaseExist(String databaseName);
+  public abstract boolean databaseExists();
 
-  public abstract void updateTableDefinition(String tableName, MessageType newSchema);
+  public abstract void updateSchema(String tableName, MessageType newSchema);
 
   public abstract List<PartitionEvent> getPartitionEvents(String tableName, List<String> writtenPartitionsSince);
 

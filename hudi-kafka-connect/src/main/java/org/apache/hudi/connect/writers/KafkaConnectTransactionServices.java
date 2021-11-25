@@ -36,6 +36,7 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.connect.transaction.TransactionCoordinator;
 import org.apache.hudi.connect.utils.KafkaConnectUtils;
 import org.apache.hudi.exception.HoodieException;
+import org.apache.hudi.hive.AwsGDCSyncTool;
 import org.apache.hudi.hive.HiveSyncConfig;
 import org.apache.hudi.hive.HiveSyncTool;
 import org.apache.hudi.keygen.KeyGenerator;
@@ -168,6 +169,9 @@ public class KafkaConnectTransactionServices implements ConnectTransactionServic
           case "org.apache.hudi.hive.HiveSyncTool":
             syncHive();
             break;
+          case "org.apache.hudi.hive.AwsGDCSyncTool":
+            syncGlue();
+            break;
           default:
             FileSystem fs = FSUtils.getFs(tableBasePath, new Configuration());
             Properties properties = new Properties();
@@ -181,10 +185,7 @@ public class KafkaConnectTransactionServices implements ConnectTransactionServic
   }
 
   private void syncHive() {
-    HiveSyncConfig hiveSyncConfig = DataSourceUtils.buildHiveSyncConfig(
-        new TypedProperties(connectConfigs.getProps()),
-        tableBasePath,
-        "PARQUET");
+    HiveSyncConfig hiveSyncConfig = DataSourceUtils.buildHiveSyncConfig(new TypedProperties(connectConfigs.getProps()), tableBasePath, "PARQUET");
     LOG.info("Syncing target hoodie table with hive table("
         + hiveSyncConfig.tableName
         + "). Hive metastore URL :"
@@ -196,5 +197,13 @@ public class KafkaConnectTransactionServices implements ConnectTransactionServic
     hiveConf.addResource(fs.getConf());
     LOG.info("Hive Conf => " + hiveConf.getAllProperties().toString());
     new HiveSyncTool(hiveSyncConfig, hiveConf, fs).syncHoodieTable();
+  }
+
+  private void syncGlue() {
+    HiveSyncConfig hiveSyncConfig = DataSourceUtils.buildHiveSyncConfig(new TypedProperties(connectConfigs.getProps()), tableBasePath, "PARQUET");
+    LOG.info("Syncing target hoodie table with aws glue db=" + hiveSyncConfig.databaseName
+        + " table=" + hiveSyncConfig.tableName
+        + ", basePath :" + tableBasePath);
+    new AwsGDCSyncTool(hiveSyncConfig, FSUtils.getFs(tableBasePath, hadoopConf)).syncHoodieTable();
   }
 }
