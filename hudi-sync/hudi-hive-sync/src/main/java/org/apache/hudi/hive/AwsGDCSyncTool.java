@@ -39,12 +39,7 @@ public class AwsGDCSyncTool extends HiveSyncTool {
   public AwsGDCSyncTool(HiveSyncConfig cfg, FileSystem fs) {
     super(enableGlueSync(cfg), new HiveConf(), fs);
   }
-
-  @Override
-  public void syncHoodieTable() {
-    super.syncHoodieTable();
-  }
-
+  
   private static HiveSyncConfig enableGlueSync(HiveSyncConfig hiveSyncConfig) {
     hiveSyncConfig.isAwsGlueDataCatalogSyncEnabled = true;
     return hiveSyncConfig;

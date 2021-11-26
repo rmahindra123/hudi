@@ -1,0 +1,29 @@
+{
+    "name": "hudi-sink",
+    "config": {
+		"bootstrap.servers": "kafkabroker:9092",
+		"connector.class": "org.apache.hudi.connect.HoodieSinkConnector",
+		"tasks.max": "4",
+		"key.converter": "org.apache.kafka.connect.storage.StringConverter",
+		"value.converter": "org.apache.kafka.connect.storage.StringConverter",
+		"value.converter.schemas.enable": "false",
+		"topics": "hudi-test-topic",
+		"hoodie.table.name": "hudi-test-topic",
+		"hoodie.table.type": "COPY_ON_WRITE",
+		"hoodie.metadata.enable": "false",
+		"hoodie.base.path": "s3a://onehousedemo-ff162679-3f65-4866-8a52-15aee681cfd9/onehousedemo_default/hudi-test-topic/",
+		"hoodie.datasource.write.recordkey.field": "volume",
+		"hoodie.datasource.write.partitionpath.field": "date",
+		"hoodie.schemaprovider.class": "org.apache.hudi.schema.SchemaRegistryProvider",
+		"hoodie.deltastreamer.schemaprovider.registry.url": "http://localhost:8082/subjects/hudi-test-topic/versions/latest",
+		"hoodie.kafka.commit.interval.secs": 60,
+		"hoodie.meta.sync.enable": "true",
+		"hoodie.meta.sync.classes": "org.apache.hudi.hive.AwsGDCSyncTool",
+		"hoodie.datasource.hive_sync.table": "huditesttopic",
+		"hoodie.datasource.hive_sync.partition_fields": "date",
+		"hoodie.datasource.hive_sync.partition_extractor_class": "org.apache.hudi.hive.MultiPartKeysValueExtractor",
+		"hoodie.datasource.hive_sync.use_jdbc": "false",
+		"dfs.client.use.datanode.hostname": "true",
+		"fs.s3a.impl": "org.apache.hadoop.fs.s3a.S3AFileSystem"
+      }
+}

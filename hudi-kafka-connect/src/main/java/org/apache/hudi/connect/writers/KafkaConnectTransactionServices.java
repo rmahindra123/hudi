@@ -168,10 +168,10 @@ public class KafkaConnectTransactionServices implements ConnectTransactionServic
         switch (impl) {
           case "org.apache.hudi.hive.HiveSyncTool":
             syncHive();
-            break;
+            return;
           case "org.apache.hudi.hive.AwsGDCSyncTool":
             syncGlue();
-            break;
+            return;
           default:
             FileSystem fs = FSUtils.getFs(tableBasePath, new Configuration());
             Properties properties = new Properties();
